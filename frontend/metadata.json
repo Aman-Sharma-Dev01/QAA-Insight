@@ -1,0 +1,5 @@
+{
+  "name": "EduPulse Analytics - College Feedback Portal",
+  "description": "A high-performance feedback analysis system for colleges, handling 25,000+ responses from Google Sheets with AI-powered insights, dynamic filtering, and professional reporting.",
+  "requestFramePermissions": []
+}

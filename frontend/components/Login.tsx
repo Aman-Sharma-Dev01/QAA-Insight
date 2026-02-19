@@ -92,7 +92,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           <div className="flex flex-col items-center justify-center mb-2">
             <div className="bg-white border border-indigo-200 shadow flex items-center justify-center" style={{height:'90px',width:'200px',borderRadius:'6px'}}>
-              <img src="/public/image.png" alt="QAA–Insight4Excellence Logo" className="object-contain h-full w-full" style={{borderRadius:'4px'}} />
+              <img src="/image.png" alt="QAA–Insight4Excellence Logo" className="object-contain h-full w-full" style={{borderRadius:'4px'}} />
             </div>
           </div>
           <h1 className="text-2xl font-bold tracking-tight mt-2">QAA–Insight4Excellence</h1>

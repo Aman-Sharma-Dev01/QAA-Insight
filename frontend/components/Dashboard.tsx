@@ -1252,7 +1252,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <div className="flex items-center gap-3 text-indigo-600 mb-6">
             <div className="flex flex-col items-center justify-center">
               <div className="bg-white border border-indigo-200 shadow mb-1 flex items-center justify-center" style={{height:'72px',width:'160px',borderRadius:'6px'}}>
-                <img src="/public/image.png" alt="QAA–Insight4Excellence Logo" className="object-contain h-full w-full" style={{borderRadius:'4px'}} />
+                <img src="/image.png" alt="QAA–Insight4Excellence Logo" className="object-contain h-full w-full" style={{borderRadius:'4px'}} />
               </div>
               <span className="font-bold text-lg tracking-tight text-indigo-700 text-center">QAA–Insight4Excellence</span>
             </div>

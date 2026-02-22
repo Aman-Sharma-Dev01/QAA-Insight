@@ -37,7 +37,7 @@ const generalLimiter = rateLimit({
 // Stricter rate limit for heavy analytics endpoints
 const analyticsLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute window
-  max: 30, // 30 requests per minute for analytics
+  max: 300, // 300 requests per minute for analytics
   message: { success: false, error: 'Too many analytics requests. Please wait.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -56,7 +56,7 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
 ];
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -87,8 +87,8 @@ app.use('/api/user', userRoutes);
 
 // Health check with cache stats
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     cache: cacheService.getStats()
   });
@@ -105,9 +105,9 @@ app.get('/api/cache/stats', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server Error:', err);
-  res.status(500).json({ 
-    success: false, 
-    error: err.message || 'Internal server error' 
+  res.status(500).json({
+    success: false,
+    error: err.message || 'Internal server error'
   });
 });
 

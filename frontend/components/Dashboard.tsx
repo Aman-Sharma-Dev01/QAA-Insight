@@ -7,7 +7,7 @@ import StatsCards from './StatsCards';
 import AnalyticsCharts from './AnalyticsCharts';
 import FilteredDataTable from './FilteredDataTable';
 import FacultyScorecard from './FacultyScorecard';
-import { Filter, Download, Database, ChevronDown, ChevronLeft, ChevronRight, User as UserIcon, LogOut, BrainCircuit, Plus, FileText, X, RefreshCw, Clock, Search, AlertCircle, Table, BarChart3, CheckCircle, Award, Users, BookOpen, Layers, PanelLeftClose, PanelLeft, FileSpreadsheet, Star } from 'lucide-react';
+import { Filter, Download, Database, ChevronDown, ChevronLeft, ChevronRight, User as UserIcon, LogOut, BrainCircuit, Plus, FileText, X, RefreshCw, Clock, Search, AlertCircle, Table, BarChart3, CheckCircle, Award, Users, BookOpen, Layers, PanelLeftClose, PanelLeft, FileSpreadsheet, Star, StarHalf } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface DashboardProps {
@@ -1768,7 +1768,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             <Star className="w-5 h-5 text-white" />
                           </div>
                           <div>
-                            <h3 className="font-bold text-emerald-800 text-lg">{facultyAverages.facultyName}</h3>
+                            <h3 className="font-bold text-emerald-800 text-lg flex items-center gap-3">
+                              {facultyAverages.facultyName}
+                              <div className="flex items-center gap-0.5 bg-white/60 px-2 py-1 rounded-md border border-emerald-100">
+                                {[1, 2, 3, 4, 5].map((star) => {
+                                  const roundedAvg = Number(facultyAverages.overallAvg.toFixed(1));
+                                  const fill = roundedAvg >= star;
+                                  const halfFill = !fill && roundedAvg >= star - 0.5;
+                                  if (fill) {
+                                    return <Star key={star} className="w-4 h-4 text-amber-400 fill-amber-400" />;
+                                  } else if (halfFill) {
+                                    return <StarHalf key={star} className="w-4 h-4 text-amber-400 fill-amber-400 md:text-amber-400 md:fill-amber-400" />;
+                                  } else {
+                                    return <Star key={star} className="w-4 h-4 text-slate-300" />;
+                                  }
+                                })}
+                                <span className="ml-1 text-sm font-bold text-slate-700">
+                                  {facultyAverages.overallAvg.toFixed(1)}
+                                </span>
+                              </div>
+                            </h3>
                             <p className="text-xs text-emerald-600">Average scores based on filtered data</p>
                           </div>
                         </div>

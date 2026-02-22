@@ -1,8 +1,8 @@
 
 // Fix: Use namespace import for React to ensure JSX types are correctly resolved
 import * as React from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend, RadarChart, Radar, PolarGrid,
   PolarAngleAxis, PolarRadiusAxis, ComposedChart, Area
 } from 'recharts';
@@ -23,7 +23,7 @@ const RATING_COLORS = {
 
 const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
   const [activeTab, setActiveTab] = React.useState<'faculty' | 'courses' | 'sections' | 'parameters'>('faculty');
-  
+
   const {
     questionScores = [],
     departmentWise = [],
@@ -88,7 +88,7 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
         <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
           <p className="font-semibold text-slate-800">{data.fullName || label}</p>
           <p className="text-sm text-indigo-600">
-            Score: <strong>{payload[0].value?.toFixed(2)}</strong>/5.00
+            Score: <strong>{payload[0].value?.toFixed(1)}</strong>/5.0
           </p>
           {data.feedbacks !== undefined && (
             <p className="text-xs text-slate-500">Feedbacks: {data.feedbacks}</p>
@@ -106,41 +106,37 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('faculty')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'faculty' 
-                ? 'bg-indigo-600 text-white' 
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'faculty'
+                ? 'bg-indigo-600 text-white'
                 : 'text-slate-600 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <Users className="w-4 h-4" /> Faculty Comparison
           </button>
           <button
             onClick={() => setActiveTab('courses')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'courses' 
-                ? 'bg-indigo-600 text-white' 
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'courses'
+                ? 'bg-indigo-600 text-white'
                 : 'text-slate-600 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <BookOpen className="w-4 h-4" /> Course Analysis
           </button>
           <button
             onClick={() => setActiveTab('sections')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'sections' 
-                ? 'bg-indigo-600 text-white' 
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'sections'
+                ? 'bg-indigo-600 text-white'
                 : 'text-slate-600 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <Layers className="w-4 h-4" /> Section Analysis
           </button>
           <button
             onClick={() => setActiveTab('parameters')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'parameters' 
-                ? 'bg-indigo-600 text-white' 
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'parameters'
+                ? 'bg-indigo-600 text-white'
                 : 'text-slate-600 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <BarChart2 className="w-4 h-4" /> Parameter Scores
           </button>
@@ -169,17 +165,17 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
                 <BarChart data={questionScores} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" domain={[0, 5]} />
-                  <YAxis 
-                    dataKey="question" 
-                    type="category" 
-                    width={200} 
+                  <YAxis
+                    dataKey="question"
+                    type="category"
+                    width={200}
                     tick={{ fontSize: 11 }}
                     tickFormatter={(value) => value.length > 35 ? value.substring(0, 35) + '...' : value}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar 
-                    dataKey="score" 
-                    radius={[0, 4, 4, 0]} 
+                  <Bar
+                    dataKey="score"
+                    radius={[0, 4, 4, 0]}
                     barSize={20}
                   >
                     {questionScores.map((entry, index) => (
@@ -188,11 +184,11 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
                   </Bar>
                 </BarChart>
               ) : (
-                <ComposedChart 
+                <ComposedChart
                   data={
                     activeTab === 'faculty' ? facultyChartData :
-                    activeTab === 'courses' ? courseChartData :
-                    sectionChartData
+                      activeTab === 'courses' ? courseChartData :
+                        sectionChartData
                   }
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -204,9 +200,9 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
                   <Bar yAxisId="left" dataKey="score" name="Score" radius={[4, 4, 0, 0]} barSize={30}>
                     {(activeTab === 'faculty' ? facultyChartData :
                       activeTab === 'courses' ? courseChartData :
-                      sectionChartData).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={getScoreColor(entry.score)} />
-                    ))}
+                        sectionChartData).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getScoreColor(entry.score)} />
+                        ))}
                   </Bar>
                   <Line yAxisId="right" type="monotone" dataKey="feedbacks" name="Feedbacks" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4 }} />
                 </ComposedChart>
@@ -225,15 +221,15 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
                 <PolarGrid />
                 <PolarAngleAxis dataKey="parameter" tick={{ fontSize: 12 }} />
                 <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
-                <Tooltip 
-                  formatter={(value: number) => [value.toFixed(2), 'Score']}
+                <Tooltip
+                  formatter={(value: number) => [value.toFixed(1), 'Score']}
                   labelFormatter={(label) => radarData.find(d => d.parameter === label)?.fullName || label}
                 />
-                <Radar 
-                  name="Score" 
-                  dataKey="score" 
-                  stroke="#6366f1" 
-                  fill="#6366f1" 
+                <Radar
+                  name="Score"
+                  dataKey="score"
+                  stroke="#6366f1"
+                  fill="#6366f1"
                   fillOpacity={0.4}
                   strokeWidth={2}
                 />
@@ -305,12 +301,12 @@ const AnalyticsCharts: React.FC<ChartsProps> = ({ data }) => {
                   <XAxis dataKey="label" />
                   <YAxis domain={[3, 5]} />
                   <Tooltip />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
+                  <Line
+                    type="monotone"
+                    dataKey="value"
                     name="Average Score"
-                    stroke="#6366f1" 
-                    strokeWidth={3} 
+                    stroke="#6366f1"
+                    strokeWidth={3}
                     dot={{ r: 6, fill: '#6366f1' }}
                     activeDot={{ r: 8 }}
                   />

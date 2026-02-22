@@ -79,20 +79,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [error, setError] = React.useState<string>('');
   const [sheetValidating, setSheetValidating] = React.useState(false);
   const [sheetValidationResult, setSheetValidationResult] = React.useState<{ valid: boolean; title?: string } | null>(null);
-  
+
   // View mode - analytics, scorecard, or data table
   const [viewMode, setViewMode] = React.useState<ViewMode>('data');
-  
+
   // Sidebar resizable state
   const [sidebarWidth, setSidebarWidth] = React.useState(320); // Default width in pixels
   const [isResizing, setIsResizing] = React.useState(false);
   const sidebarRef = React.useRef<HTMLElement>(null);
   const MIN_SIDEBAR_WIDTH = 200;
   const MAX_SIDEBAR_WIDTH = 600;
-  
+
   // Global search state
   const [globalSearchQuery, setGlobalSearchQuery] = React.useState('');
-  
+
   // Filtered data state
   const [filteredDataHeaders, setFilteredDataHeaders] = React.useState<string[]>([]);
   const [filteredData, setFilteredData] = React.useState<FilteredDataRow[]>([]);
@@ -104,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   });
   const [filteredDataLoading, setFilteredDataLoading] = React.useState(false);
   const [exporting, setExporting] = React.useState(false);
-  
+
   // State for search queries in filter categories
   const [filterSearchQueries, setFilterSearchQueries] = React.useState<Record<string, string>>({});
 
@@ -135,10 +135,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const m = str1.length;
     const n = str2.length;
     const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
-    
+
     for (let i = 0; i <= m; i++) dp[i][0] = i;
     for (let j = 0; j <= n; j++) dp[0][j] = j;
-    
+
     for (let i = 1; i <= m; i++) {
       for (let j = 1; j <= n; j++) {
         if (str1[i - 1] === str2[j - 1]) {
@@ -166,7 +166,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     // Extract core name by removing common prefixes/suffixes
     const prefixes = ['mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'dr', 'dr.', 'prof', 'prof.', 'shri', 'smt'];
     const suffixes = ['sir', 'mam', 'ma\'am', 'madam', 'madem', 'mem', 'maam', 'ji', 'g'];
-    
+
     const cleanName = (name: string): string => {
       let cleaned = name.toLowerCase().trim().replace(/\s+/g, ' ');
       let words = cleaned.split(' ');
@@ -178,9 +178,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       }
       return words.join(' ');
     };
-    
+
     const targetClean = cleanName(targetName);
-    
+
     return allNames.filter(name => {
       if (name === targetName) return false;
       const nameClean = cleanName(name);
@@ -194,11 +194,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Fetch metadata and analytics
   const refreshData = React.useCallback(async (isBackground = false) => {
     if (!activeSheet) return;
-    
+
     if (isBackground) setBackgroundRefreshing(true);
     else setLoading(true);
     setError('');
-    
+
     try {
       // 1. Get Metadata (Headers & Unique Values for Filters)
       const metaResponse = await dataService.getSheetMetadata(activeSheet.url);
@@ -229,9 +229,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Fetch filtered data for table view
   const fetchFilteredData = React.useCallback(async (page: number = 1) => {
     if (!activeSheet) return;
-    
+
     setFilteredDataLoading(true);
-    
+
     try {
       const response = await dataService.getFilteredData(activeSheet.url, filterState, page, 50);
       if (response.success && response.data) {
@@ -272,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setMergedNames({});
         return;
       }
-      
+
       setMergedNamesLoading(true);
       try {
         const response = await dataService.getMergedNames(activeSheet.id);
@@ -288,7 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setMergedNamesLoading(false);
       }
     };
-    
+
     loadMergedNames();
   }, [activeSheet?.id]);
 
@@ -299,27 +299,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setFacultyAverages(null);
         return;
       }
-      
+
       // Check if any filter is applied
       const hasFilters = Object.values(filterState).some(v => v.length > 0);
       if (!hasFilters) {
         setFacultyAverages(null);
         return;
       }
-      
+
       try {
         const response = await dataService.getExportData(activeSheet.url, filterState);
-        
+
         if (response.success && response.data) {
           const { headers, data } = response.data;
-          
+
           // Identify column indices
           const findHeader = (patterns: string[]): string | null => {
             return headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase()))) || null;
           };
-          
+
           const facultyCol = findHeader(['faculty', 'teacher']);
-          
+
           // Collect exact metadata column names to exclude
           const schoolCol = findHeader(['school']);
           const deptCol = findHeader(['department']);
@@ -327,13 +327,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           const sectionCol = findHeader(['section', 'class-section']);
           const courseCol = findHeader(['course']);
           const remarkCol = findHeader(['remark', 'comment', 'feedback', 'suggestion']);
-          
+
           const metadataColumns = new Set<string>(
             [facultyCol, schoolCol, deptCol, semesterCol, sectionCol, courseCol, remarkCol]
               .filter((col): col is string => col !== null)
               .map(col => col.toLowerCase())
           );
-          
+
           // Find question columns
           const questionColumns = headers.filter(h => {
             const hLower = h.toLowerCase();
@@ -342,7 +342,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             if (shortSkipPatterns.some(p => hLower === p || hLower.includes('timestamp') || hLower.includes('email address'))) {
               return false;
             }
-            
+
             let numericCount = 0;
             let totalCount = 0;
             data.forEach(row => {
@@ -354,12 +354,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             });
             return totalCount > 0 && (numericCount / totalCount) >= 0.5;
           });
-          
+
           if (questionColumns.length === 0) {
             setFacultyAverages(null);
             return;
           }
-          
+
           // Calculate averages
           const questionTotals: Record<string, { sum: number; count: number }> = {};
           let facultyName = 'Selected Faculty';
@@ -368,7 +368,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           let course = '';
           let section = '';
           const comments: string[] = [];
-          
+
           // Helper to check if comment is valid
           const isValidComment = (comment: string): boolean => {
             if (!comment || typeof comment !== 'string') return false;
@@ -380,17 +380,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             if (words.length <= 1) return false;
             return true;
           };
-          
+
           // Get canonical faculty name from merged names or filter
           if (facultyCol) {
-            const facultyFilter = Object.entries(filterState).find(([key]) => 
+            const facultyFilter = Object.entries(filterState).find(([key]) =>
               key.toLowerCase().includes('faculty') || key.toLowerCase().includes('teacher')
             );
             if (facultyFilter && facultyFilter[1].length > 0) {
               // Get canonical name from mergedNames if available
               const selectedNames = facultyFilter[1];
               const categoryMerges = mergedNames[facultyFilter[0]] || {};
-              
+
               // Find canonical name
               let canonicalName = selectedNames[0];
               for (const [canonical, variants] of Object.entries(categoryMerges)) {
@@ -402,22 +402,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               facultyName = canonicalName;
             }
           }
-          
+
           // Collect metadata and scores from first row and aggregate
           const uniqueCourses = new Set<string>();
           const uniqueSections = new Set<string>();
-          
+
           data.forEach((row, idx) => {
             // Get metadata from first row
             if (idx === 0) {
               school = schoolCol ? String(row[schoolCol] || '') : '';
               department = deptCol ? String(row[deptCol] || '') : '';
             }
-            
+
             // Collect unique courses and sections
             if (courseCol && row[courseCol]) uniqueCourses.add(String(row[courseCol]));
             if (sectionCol && row[sectionCol]) uniqueSections.add(String(row[sectionCol]));
-            
+
             // Collect question scores
             questionColumns.forEach(qCol => {
               const val = Number(row[qCol]);
@@ -429,7 +429,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 questionTotals[qCol].count += 1;
               }
             });
-            
+
             // Collect valid comments
             if (remarkCol) {
               const comment = String(row[remarkCol] || '').trim();
@@ -438,20 +438,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               }
             }
           });
-          
+
           course = Array.from(uniqueCourses).join(', ');
           section = Array.from(uniqueSections).join(', ');
-          
+
           const questionScores = questionColumns.map((qCol, i) => {
             const totals = questionTotals[qCol];
             const avg = totals && totals.count > 0 ? totals.sum / totals.count : 0;
             return { name: `Q${i + 1}`, avg };
           });
-          
-          const overallAvg = questionScores.length > 0 
-            ? questionScores.reduce((a, b) => a + b.avg, 0) / questionScores.length 
+
+          const overallAvg = questionScores.length > 0
+            ? questionScores.reduce((a, b) => a + b.avg, 0) / questionScores.length
             : 0;
-          
+
           setFacultyAverages({
             questionScores,
             overallAvg,
@@ -468,7 +468,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         setFacultyAverages(null);
       }
     };
-    
+
     calculateFacultyAverages();
   }, [activeSheet, filterState]);
 
@@ -476,7 +476,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const getDisplayOptions = React.useCallback((category: string, options: string[]): { displayName: string; originalNames: string[] }[] => {
     const categoryMerges = mergedNames[category] || {};
     const displayMap = new Map<string, string[]>();
-    
+
     options.forEach(opt => {
       let foundCanonical = opt;
       // Check if this option is a variant
@@ -486,13 +486,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           break;
         }
       }
-      
+
       if (!displayMap.has(foundCanonical)) {
         displayMap.set(foundCanonical, []);
       }
       displayMap.get(foundCanonical)!.push(opt);
     });
-    
+
     return Array.from(displayMap.entries()).map(([displayName, originalNames]) => ({
       displayName,
       originalNames
@@ -511,10 +511,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Handle confirming merge
   const handleConfirmMerge = async () => {
     if (!mergeCanonicalName || mergeSelectedNames.length < 2 || !activeSheet?.id) return;
-    
+
     const newMergedNames = { ...mergedNames };
     const categoryMerges = { ...newMergedNames[mergeCategory] } || {};
-    
+
     // Remove any existing merges that include these names
     for (const canonical of Object.keys(categoryMerges)) {
       categoryMerges[canonical] = categoryMerges[canonical].filter(
@@ -525,14 +525,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         delete categoryMerges[canonical];
       }
     }
-    
+
     // Add new merge with all selected names as variants
     categoryMerges[mergeCanonicalName] = [...mergeSelectedNames];
     newMergedNames[mergeCategory] = categoryMerges;
-    
+
     // Update local state immediately
     setMergedNames(newMergedNames);
-    
+
     // Update filter state to include ALL original variant names (not just canonical)
     // This ensures the backend filters by all the merged names
     setFilterState(prev => {
@@ -543,14 +543,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       const newValues = [...new Set([...otherValues, ...mergeSelectedNames])];
       return { ...prev, [mergeCategory]: newValues };
     });
-    
+
     // Save to backend
     try {
       await dataService.updateMergedNames(activeSheet.id, newMergedNames);
     } catch (err) {
       console.error('Failed to save merged names:', err);
     }
-    
+
     setShowMergeModal(false);
     setMergeCategory('');
     setMergeSelectedNames([]);
@@ -560,15 +560,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Handle unmerging a canonical name
   const handleUnmerge = async (category: string, canonicalName: string) => {
     if (!activeSheet?.id) return;
-    
+
     const newMergedNames = { ...mergedNames };
     const categoryMerges = { ...newMergedNames[category] };
     delete categoryMerges[canonicalName];
     newMergedNames[category] = categoryMerges;
-    
+
     // Update local state immediately
     setMergedNames(newMergedNames);
-    
+
     // Save to backend
     try {
       await dataService.updateMergedNames(activeSheet.id, newMergedNames);
@@ -601,7 +601,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             }));
             setAvailableSheets(sheetSources);
             localStorage.setItem(STORAGE_KEYS.SAVED_SHEETS, JSON.stringify(sheetSources));
-            
+
             // Set active sheet to default or first
             const defaultSheet = sheetSources.find(s => s.id === defaultSheetId) || sheetSources[0];
             if (defaultSheet) {
@@ -653,10 +653,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           const result = await dataService.checkForUpdates(activeSheet.url);
           if (result.success && result.data) {
             const { hasChanged, delta, shouldInstantRefresh } = result.data;
-            
+
             if (hasChanged) {
               console.log(`Smart refresh: ${delta} changes detected`);
-              
+
               if (shouldInstantRefresh) {
                 // 1-10 changes: instant refresh (already triggered on backend)
                 console.log('Instant refresh triggered for small change');
@@ -671,10 +671,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           console.error('Smart refresh check failed:', error);
         }
       };
-      
+
       // Check every 30 seconds for updates
       refreshTimerRef.current = window.setInterval(smartRefresh, 30000);
-      
+
       // Also run immediately on enable
       smartRefresh();
     } else {
@@ -714,10 +714,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const validateSheetUrl = async () => {
     if (!newSheetUrl) return;
-    
+
     setSheetValidating(true);
     setSheetValidationResult(null);
-    
+
     try {
       const result = await dataService.validateSheet(newSheetUrl);
       if (result.success && result.data) {
@@ -737,7 +737,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const handleAddSheet = async () => {
     if (!newSheetUrl || !newSheetName) return;
-    
+
     const sheetId = Date.now().toString();
     const newSheet: SheetSource = {
       id: sheetId,
@@ -745,14 +745,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       url: newSheetUrl,
       dateAdded: new Date().toISOString().split('T')[0]
     };
-    
+
     // Save to MongoDB
     try {
       await dataService.saveUserSheet(sheetId, newSheetName, newSheetUrl);
     } catch (err) {
       console.error('Failed to save sheet to database:', err);
     }
-    
+
     setAvailableSheets(prev => [...prev, newSheet]);
     setActiveSheet(newSheet);
     setShowSheetModal(false);
@@ -768,7 +768,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     } catch (err) {
       console.error('Failed to remove sheet from database:', err);
     }
-    
+
     setAvailableSheets(prev => prev.filter(s => s.id !== sheetId));
     if (activeSheet?.id === sheetId) {
       const remaining = availableSheets.filter(s => s.id !== sheetId);
@@ -779,10 +779,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Fetch all filtered data for average calculations
   const fetchAllFilteredData = async (): Promise<FilteredDataRow[]> => {
     if (!activeSheet) return [];
-    
+
     try {
       const response = await dataService.getExportData(activeSheet.url, filterState);
-      
+
       if (response.success && response.data) {
         return response.data.data;
       }
@@ -803,17 +803,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const exportFilteredCSV = async (includeAverages: boolean = false, averages: QuestionAverage[] = [], overallAverage: number = 0) => {
     if (!activeSheet) return;
-    
+
     setExporting(true);
     try {
       const response = await dataService.getExportData(activeSheet.url, filterState);
-      
+
       if (response.success && response.data) {
         const { headers, data } = response.data;
-        
+
         // Build CSV content
         let csv = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
-        
+
         data.forEach(row => {
           const rowValues = headers.map(h => {
             const val = row[h];
@@ -822,30 +822,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           });
           csv += rowValues.join(',') + '\n';
         });
-        
+
         // Add averages section if requested
         if (includeAverages && averages.length > 0) {
           csv += '\n\n';
           csv += '"","","AVERAGES SUMMARY","",""\n';
           csv += '"Question","Average Score","Responses","Rating"\n';
-          
+
           averages.forEach(avg => {
-            const rating = avg.average >= 4.5 ? 'Excellent' : 
-                          avg.average >= 4.0 ? 'Very Good' : 
-                          avg.average >= 3.5 ? 'Good' : 
-                          avg.average >= 3.0 ? 'Satisfactory' : 'Needs Improvement';
-            csv += `"${avg.question.replace(/"/g, '""')}","${avg.average.toFixed(2)}","${avg.count}","${rating}"\n`;
+            const rating = avg.average >= 4.5 ? 'Excellent' :
+              avg.average >= 4.0 ? 'Very Good' :
+                avg.average >= 3.5 ? 'Good' :
+                  avg.average >= 3.0 ? 'Satisfactory' : 'Needs Improvement';
+            csv += `"${avg.question.replace(/"/g, '""')}","${avg.average.toFixed(1)}","${avg.count}","${rating}"\n`;
           });
-          
+
           // Add overall average
           csv += '\n';
-          const overallRating = overallAverage >= 4.5 ? 'Excellent' : 
-                               overallAverage >= 4.0 ? 'Very Good' : 
-                               overallAverage >= 3.5 ? 'Good' : 
-                               overallAverage >= 3.0 ? 'Satisfactory' : 'Needs Improvement';
-          csv += `"OVERALL AVERAGE","${overallAverage.toFixed(2)}","","${overallRating}"\n`;
+          const overallRating = overallAverage >= 4.5 ? 'Excellent' :
+            overallAverage >= 4.0 ? 'Very Good' :
+              overallAverage >= 3.5 ? 'Good' :
+                overallAverage >= 3.0 ? 'Satisfactory' : 'Needs Improvement';
+          csv += `"OVERALL AVERAGE","${overallAverage.toFixed(1)}","","${overallRating}"\n`;
         }
-        
+
         // Download
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
@@ -854,7 +854,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         const filterCount = Object.values(filterState).filter(v => v.length > 0).length;
         const suffix = filterCount > 0 ? '_filtered' : '_all';
         const avgSuffix = includeAverages ? '_with_averages' : '';
-        a.download = `${activeSheet.name.replace(/\s+/g, '_')}${suffix}${avgSuffix}_${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = `${activeSheet.name.replace(/\s+/g, '_')}${suffix}${avgSuffix}_${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
       }
@@ -869,17 +869,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Export analytics summary as CSV
   const exportAnalyticsCSV = () => {
     if (!analytics || !activeSheet) return;
-    
+
     let csv = "Parameter,Score\n";
     analytics.questionScores.forEach(q => {
       csv += `"${q.question.replace(/"/g, '""')}",${q.score}\n`;
     });
-    
+
     csv += "\nDepartment,Score,Responses\n";
     analytics.departmentWise.forEach(d => {
       csv += `"${d.name}",${d.score},${d.count}\n`;
     });
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -892,19 +892,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   // Export filtered data as formatted Excel with averages and comments
   const exportFilteredAverageExcel = async (averages: QuestionAverage[] = [], overallAverage: number = 0) => {
     if (!activeSheet) return;
-    
+
     setExporting(true);
     try {
       const response = await dataService.getExportData(activeSheet.url, filterState);
-      
+
       if (response.success && response.data) {
         const { headers, data } = response.data;
-        
+
         // Identify column indices for required fields
         const findHeader = (patterns: string[]): string | null => {
           return headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase()))) || null;
         };
-        
+
         const facultyCol = findHeader(['faculty', 'teacher']);
         const schoolCol = findHeader(['school']);
         const deptCol = findHeader(['department']);
@@ -912,29 +912,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         const sectionCol = findHeader(['section', 'class-section']);
         const courseCol = findHeader(['course']);
         const remarkCol = findHeader(['remark', 'comment', 'feedback', 'suggestion']);
-        
+
         // Collect exact metadata column names to exclude
         const metadataColumns = new Set<string>(
           [facultyCol, schoolCol, deptCol, semesterCol, sectionCol, courseCol, remarkCol]
             .filter((col): col is string => col !== null)
             .map(col => col.toLowerCase())
         );
-        
+
         // Find question columns (numeric score columns)
         const questionColumns = headers.filter(h => {
           const hLower = h.toLowerCase();
-          
+
           // Skip if it's an exact metadata column
           if (metadataColumns.has(hLower)) {
             return false;
           }
-          
+
           // Skip obvious non-question columns by exact short names
           const shortSkipPatterns = ['timestamp', 'email', 's.no', 's. no', 'sno', 'roll no', 'roll number'];
           if (shortSkipPatterns.some(p => hLower === p || hLower.includes('timestamp') || hLower.includes('email address'))) {
             return false;
           }
-          
+
           // Check if column has mostly numeric values (ratings)
           let numericCount = 0;
           let totalCount = 0;
@@ -950,7 +950,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           // Consider it a question column if at least 50% of values are numeric
           return totalCount > 0 && (numericCount / totalCount) >= 0.5;
         });
-        
+
         // Helper to check if comment is valid
         const isValidComment = (comment: string): boolean => {
           if (!comment || typeof comment !== 'string') return false;
@@ -964,14 +964,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           if (words.length <= 1) return false;
           return true;
         };
-        
+
         // Helper to get canonical name using merged names mapping
         const getCanonicalFacultyName = (name: string): string => {
           if (!facultyCol) return name;
           const categoryKey = facultyCol;
           const categoryMerges = mergedNames[categoryKey];
           if (!categoryMerges) return name;
-          
+
           // Check if this name is a variant of any canonical name
           for (const [canonical, variants] of Object.entries(categoryMerges)) {
             if (variants.includes(name) || canonical === name) {
@@ -980,67 +980,72 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           }
           return name;
         };
-        
-        // Group data by faculty (using merged canonical names)
-        const facultyGroups: Record<string, { 
+
+        // Group data by faculty and section
+        const facultyGroups: Record<string, {
           info: Record<string, string>;
           questionTotals: Record<string, { sum: number; count: number }>;
           comments: string[];
         }> = {};
-        
+
         data.forEach(row => {
           const originalFaculty = facultyCol ? String(row[facultyCol] || '').trim() : 'Unknown';
           if (!originalFaculty) return;
-          
+
           // Get canonical name for grouping
           const faculty = getCanonicalFacultyName(originalFaculty);
-          
-          if (!facultyGroups[faculty]) {
-            facultyGroups[faculty] = {
+          // Get section for grouping
+          const section = sectionCol ? String(row[sectionCol] || '').trim() : '';
+
+          // Create a composite key for grouping by both faculty and section
+          const groupKey = `${faculty}|${section}`;
+
+          if (!facultyGroups[groupKey]) {
+            facultyGroups[groupKey] = {
               info: {
                 'Faculty Name': faculty,
                 'School': schoolCol ? String(row[schoolCol] || '') : '',
                 'Department': deptCol ? String(row[deptCol] || '') : '',
                 'Semester': semesterCol ? String(row[semesterCol] || '') : '',
-                'Section': sectionCol ? String(row[sectionCol] || '') : '',
+                'Section': section,
                 'Course Name': courseCol ? String(row[courseCol] || '') : ''
               },
               questionTotals: {},
               comments: []
             };
           }
-          
+
           // Accumulate question scores
           questionColumns.forEach(qCol => {
             const val = Number(row[qCol]);
             if (!isNaN(val)) {
-              if (!facultyGroups[faculty].questionTotals[qCol]) {
-                facultyGroups[faculty].questionTotals[qCol] = { sum: 0, count: 0 };
+              if (!facultyGroups[groupKey].questionTotals[qCol]) {
+                facultyGroups[groupKey].questionTotals[qCol] = { sum: 0, count: 0 };
               }
-              facultyGroups[faculty].questionTotals[qCol].sum += val;
-              facultyGroups[faculty].questionTotals[qCol].count += 1;
+              facultyGroups[groupKey].questionTotals[qCol].sum += val;
+              facultyGroups[groupKey].questionTotals[qCol].count += 1;
             }
           });
-          
+
           // Collect valid comments
           if (remarkCol) {
             const comment = String(row[remarkCol] || '').trim();
             if (isValidComment(comment)) {
-              facultyGroups[faculty].comments.push(comment);
+              facultyGroups[groupKey].comments.push(comment);
             }
           }
         });
-        
+
         // Build Excel data
         const excelData: Record<string, unknown>[] = [];
         const shortQuestionNames = questionColumns.map((q, i) => `Q${i + 1}`);
-        
+
         // Headers for the main data
         const mainHeaders = [
           'S.No', 'Faculty Name', 'School', 'Department', 'Semester', 'Section', 'Course Name',
           ...shortQuestionNames, 'Overall Avg', 'Comments'
         ];
-        
+
         let serialNo = 1;
         Object.entries(facultyGroups).forEach(([faculty, group]) => {
           // Calculate averages
@@ -1048,14 +1053,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             const totals = group.questionTotals[qCol];
             return totals && totals.count > 0 ? totals.sum / totals.count : 0;
           });
-          
-          const overallAvg = questionAvgs.length > 0 
-            ? questionAvgs.reduce((a, b) => a + b, 0) / questionAvgs.length 
+
+          const overallAvg = questionAvgs.length > 0
+            ? questionAvgs.reduce((a, b) => a + b, 0) / questionAvgs.length
             : 0;
-          
+
           // Format comments with serial numbers
           const formattedComments = group.comments.map((c, i) => `${i + 1}. ${c}`).join('\n');
-          
+
           const row: Record<string, unknown> = {
             'S.No': serialNo++,
             'Faculty Name': group.info['Faculty Name'],
@@ -1064,18 +1069,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             'Semester': group.info['Semester'],
             'Section': group.info['Section'],
             'Course Name': group.info['Course Name'],
-            'Overall Avg': overallAvg.toFixed(2),
+            'Overall Avg': overallAvg.toFixed(1),
             'Comments': formattedComments
           };
-          
+
           // Add question averages
           questionColumns.forEach((qCol, i) => {
-            row[shortQuestionNames[i]] = questionAvgs[i].toFixed(2);
+            row[shortQuestionNames[i]] = questionAvgs[i].toFixed(1);
           });
-          
+
           excelData.push(row);
         });
-        
+
         // Calculate grand averages for summary row
         const grandTotals: Record<string, { sum: number; count: number }> = {};
         Object.values(facultyGroups).forEach(group => {
@@ -1087,15 +1092,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             grandTotals[qCol].count += totals.count;
           });
         });
-        
+
         const grandQuestionAvgs = questionColumns.map(qCol => {
           const totals = grandTotals[qCol];
           return totals && totals.count > 0 ? totals.sum / totals.count : 0;
         });
-        const grandOverallAvg = grandQuestionAvgs.length > 0 
-          ? grandQuestionAvgs.reduce((a, b) => a + b, 0) / grandQuestionAvgs.length 
+        const grandOverallAvg = grandQuestionAvgs.length > 0
+          ? grandQuestionAvgs.reduce((a, b) => a + b, 0) / grandQuestionAvgs.length
           : 0;
-        
+
         // Add summary row
         const summaryRow: Record<string, unknown> = {
           'S.No': '',
@@ -1105,26 +1110,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           'Semester': '',
           'Section': '',
           'Course Name': '',
-          'Overall Avg': grandOverallAvg.toFixed(2),
+          'Overall Avg': grandOverallAvg.toFixed(1),
           'Comments': ''
         };
         questionColumns.forEach((qCol, i) => {
-          summaryRow[shortQuestionNames[i]] = grandQuestionAvgs[i].toFixed(2);
+          summaryRow[shortQuestionNames[i]] = grandQuestionAvgs[i].toFixed(1);
         });
         excelData.push(summaryRow);
-        
+
         // Create a question legend sheet
         const legendData = questionColumns.map((q, i) => ({
           'Code': shortQuestionNames[i],
           'Full Question': q
         }));
-        
+
         // Create workbook
         const wb = XLSX.utils.book_new();
-        
+
         // Create main data sheet
         const ws = XLSX.utils.json_to_sheet(excelData, { header: mainHeaders });
-        
+
         // Set column widths
         const colWidths = [
           { wch: 5 },  // S.No
@@ -1139,11 +1144,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           { wch: 60 }  // Comments
         ];
         ws['!cols'] = colWidths;
-        
+
         // Style the summary row (last row) with background color
         const summaryRowIdx = excelData.length + 1; // +1 for header row
         const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-        
+
         for (let col = range.s.c; col <= range.e.c; col++) {
           const cellRef = XLSX.utils.encode_cell({ r: summaryRowIdx - 1, c: col });
           if (ws[cellRef]) {
@@ -1154,14 +1159,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             };
           }
         }
-        
+
         XLSX.utils.book_append_sheet(wb, ws, 'Faculty Averages');
-        
+
         // Create legend sheet
         const legendWs = XLSX.utils.json_to_sheet(legendData);
         legendWs['!cols'] = [{ wch: 10 }, { wch: 100 }];
         XLSX.utils.book_append_sheet(wb, legendWs, 'Question Legend');
-        
+
         // Create Raw Data sheet with all filtered data
         const rawDataSheet: Record<string, unknown>[] = data.map((row, idx) => {
           const rawRow: Record<string, unknown> = { 'S.No': idx + 1 };
@@ -1175,12 +1180,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         const rawColWidths = [{ wch: 6 }, ...headers.map(h => ({ wch: Math.min(Math.max(h.length, 10), 40) }))];
         rawWs['!cols'] = rawColWidths;
         XLSX.utils.book_append_sheet(wb, rawWs, 'Raw Data');
-        
+
         // Download
         const filterCount = Object.values(filterState).filter(v => v.length > 0).length;
         const suffix = filterCount > 0 ? '_filtered' : '_all';
-        const fileName = `${activeSheet.name.replace(/\s+/g, '_')}_report${suffix}_${new Date().toISOString().slice(0,10)}.xlsx`;
-        
+        const fileName = `${activeSheet.name.replace(/\s+/g, '_')}_report${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
         XLSX.writeFile(wb, fileName);
       }
     } catch (err) {
@@ -1235,7 +1240,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar Filters - Resizable */}
-      <aside 
+      <aside
         ref={sidebarRef}
         style={{ width: sidebarWidth }}
         className="bg-white border-r border-slate-200 hidden md:flex flex-col relative flex-shrink-0"
@@ -1246,18 +1251,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-indigo-400 transition-colors z-10 ${isResizing ? 'bg-indigo-500' : 'bg-transparent hover:bg-indigo-300'}`}
           title="Drag to resize"
         />
-        
+
         {/* Fixed Header Section */}
         <div className="p-6 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center gap-3 text-indigo-600 mb-6">
             <div className="flex flex-col items-center justify-center">
-              <div className="bg-white border border-indigo-200 shadow mb-1 flex items-center justify-center" style={{height:'72px',width:'160px',borderRadius:'6px'}}>
-                <img src="/image.png" alt="QAA–Insight4Excellence Logo" className="object-contain h-full w-full" style={{borderRadius:'4px'}} />
+              <div className="bg-white border border-indigo-200 shadow mb-1 flex items-center justify-center" style={{ height: '72px', width: '160px', borderRadius: '6px' }}>
+                <img src="/image.png" alt="QAA–Insight4Excellence Logo" className="object-contain h-full w-full" style={{ borderRadius: '4px' }} />
               </div>
               <span className="font-bold text-lg tracking-tight text-indigo-700 text-center">QAA–Insight4Excellence</span>
             </div>
           </div>
-          
+
           <div className="space-y-1">
             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Active Feedback Source</h4>
             <div className="relative group">
@@ -1269,7 +1274,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 {availableSheets.length > 0 ? (
                   availableSheets.map(s => (
                     <div key={s.id} className="flex items-center justify-between border-b border-slate-50 last:border-0">
-                      <button 
+                      <button
                         onClick={() => setActiveSheet(s)}
                         className={`flex-1 text-left px-4 py-2.5 text-xs font-medium transition ${activeSheet?.id === s.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-indigo-50 hover:text-indigo-600'}`}
                       >
@@ -1287,7 +1292,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 ) : (
                   <p className="px-4 py-3 text-xs text-slate-400">No sheets added yet</p>
                 )}
-                <button 
+                <button
                   onClick={() => setShowSheetModal(true)}
                   className="w-full text-left px-4 py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition flex items-center gap-2 border-t border-slate-100"
                 >
@@ -1312,7 +1317,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <Filter className="w-3.5 h-3.5 text-slate-400" />
           </div>
 
-{!activeSheet ? (
+          {!activeSheet ? (
             <p className="text-sm text-slate-400 italic">Connect a Google Sheet to see filters</p>
           ) : Object.keys(dynamicFilters).length === 0 ? (
             <p className="text-sm text-slate-400 italic">{loading ? 'Loading filters...' : 'No filterable columns found'}</p>
@@ -1320,30 +1325,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="space-y-6">
               {(Object.entries(dynamicFilters) as [string, string[]][]).map(([category, options]) => {
                 const searchQuery = filterSearchQueries[category] || '';
-                
+
                 // Apply merge mapping to get display options
                 const displayOptions = getDisplayOptions(category, options);
-                
+
                 // Filter by search query (search canonical name and all variants)
-                const filteredDisplayOptions = displayOptions.filter(({ displayName, originalNames }) => 
+                const filteredDisplayOptions = displayOptions.filter(({ displayName, originalNames }) =>
                   displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                   originalNames.some(n => n.toLowerCase().includes(searchQuery.toLowerCase()))
                 );
-                
+
                 const selectedInCategory = filterState[category] || [];
-                
+
                 // Check if a display option is selected (any of its variants selected)
-                const isDisplayOptionSelected = (originalNames: string[]) => 
+                const isDisplayOptionSelected = (originalNames: string[]) =>
                   originalNames.some(n => selectedInCategory.includes(n));
-                
+
                 // Separate selected and unselected display options
                 const selectedDisplayOptions = filteredDisplayOptions.filter(opt => isDisplayOptionSelected(opt.originalNames));
                 const unselectedDisplayOptions = filteredDisplayOptions.filter(opt => !isDisplayOptionSelected(opt.originalNames));
-                
+
                 const selectedCount = selectedDisplayOptions.length;
-                
+
                 // Check if all filtered options are selected
-                const allFilteredSelected = filteredDisplayOptions.length > 0 && 
+                const allFilteredSelected = filteredDisplayOptions.length > 0 &&
                   filteredDisplayOptions.every(opt => isDisplayOptionSelected(opt.originalNames));
 
                 // Handle select all filtered options (adds all original names)
@@ -1367,12 +1372,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     [category]: newSelected
                   }));
                 };
-                
+
                 // Handle clicking on a merged display option
                 const handleMergedOptionChange = (displayName: string, originalNames: string[]) => {
                   const isSelected = isDisplayOptionSelected(originalNames);
                   const currentSelected = filterState[category] || [];
-                  
+
                   if (isSelected) {
                     // Deselect all variants
                     setFilterState(prev => ({
@@ -1397,11 +1402,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         <span className="ml-2 text-indigo-600">({selectedCount})</span>
                       )}
                     </label>
-                    
+
                     {/* Filter Search Input */}
                     <div className="relative mb-2">
                       <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input 
+                      <input
                         type="text"
                         placeholder={`Search ${category}...`}
                         className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
@@ -1447,8 +1452,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             return (
                               <div key={displayName} className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 rounded cursor-pointer transition border-l-2 border-indigo-500">
                                 <label className="flex items-center gap-2 flex-1 cursor-pointer">
-                                  <input 
-                                    type="checkbox" 
+                                  <input
+                                    type="checkbox"
                                     checked={true}
                                     onChange={() => handleMergedOptionChange(displayName, originalNames)}
                                     className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
@@ -1478,7 +1483,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                           )}
                         </>
                       )}
-                      
+
                       {/* Unselected options */}
                       {unselectedDisplayOptions.length > 0 ? (
                         unselectedDisplayOptions.map(({ displayName, originalNames }) => {
@@ -1486,8 +1491,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                           return (
                             <div key={displayName} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer transition">
                               <label className="flex items-center gap-2 flex-1 cursor-pointer">
-                                <input 
-                                  type="checkbox" 
+                                <input
+                                  type="checkbox"
                                   checked={false}
                                   onChange={() => handleMergedOptionChange(displayName, originalNames)}
                                   className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
@@ -1521,16 +1526,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               })}
             </div>
           )}
-          
+
           <div className="mt-8 space-y-3">
-            <button 
+            <button
               onClick={() => refreshData()}
               disabled={!activeSheet || loading}
               className="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-600 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Update Now
             </button>
-            <button 
+            <button
               onClick={() => { setFilterState({}); setFilterSearchQueries({}); }}
               disabled={activeFilterCount === 0}
               className="w-full py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1559,9 +1564,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             <div className="hidden sm:flex items-center gap-4 border-l border-slate-100 pl-6">
               <div className="flex items-center gap-2">
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
                     checked={autoRefresh}
                     onChange={() => setAutoRefresh(!autoRefresh)}
                     disabled={!activeSheet}
@@ -1578,7 +1583,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
             {/* Global Search Bar - Commented out for now
             <div className="hidden md:flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 w-64 lg:w-80">
@@ -1603,15 +1608,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 Updating...
               </div>
             )}
-            
+
             <div className="hidden lg:flex items-center gap-3 mr-4 py-1 px-3 bg-slate-50 rounded-full border border-slate-200">
               <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
                 <UserIcon className="w-4 h-4 text-indigo-600" />
               </div>
               <span className="text-sm font-semibold text-slate-700">{user.username}</span>
             </div>
-            
-            <button 
+
+            <button
               onClick={onLogout}
               className="p-2 text-slate-400 hover:text-red-500 transition"
               title="Logout"
@@ -1678,12 +1683,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   <div>
                     <h1 className="text-2xl font-bold text-slate-900">{activeSheet.name}</h1>
                     <p className="text-slate-500 text-sm">
-                      {analytics 
+                      {analytics
                         ? `Analyzing ${analytics.totalResponses.toLocaleString()} responses${activeFilterCount > 0 ? ` (${activeFilterCount} filters applied)` : ''}`
                         : 'Loading data...'}
                     </p>
                   </div>
-                  
+
                   <div className="flex gap-3">
                     {/* View Mode Toggle - Analytics and Scorecard commented out for now */}
                     <div className="flex bg-white border border-slate-200 rounded-lg p-1">
@@ -1711,17 +1716,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                       */}
                       <button
                         onClick={() => setViewMode('data')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                          viewMode === 'data' 
-                            ? 'bg-indigo-600 text-white' 
-                            : 'text-slate-600 hover:bg-slate-100'
-                        }`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition ${viewMode === 'data'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                          }`}
                       >
                         <Table className="w-4 h-4" /> Data
                       </button>
                     </div>
 
-                    <button 
+                    <button
                       onClick={handleGenerateAiReport}
                       disabled={isGeneratingAi || !analytics}
                       className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-100 transition active:scale-95 disabled:opacity-50"
@@ -1731,7 +1735,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                       ) : <BrainCircuit className="w-4 h-4" />}
                       AI Insights
                     </button>
-                    <button 
+                    <button
                       onClick={viewMode === 'analytics' ? exportAnalyticsCSV : exportFilteredCSV}
                       disabled={!analytics || exporting}
                       className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95 disabled:opacity-50"
@@ -1768,7 +1772,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             <p className="text-xs text-emerald-600">Average scores based on filtered data</p>
                           </div>
                         </div>
-                        
+
                         {/* Metadata: School, Department, Course, Section */}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                           {facultyAverages.school && (
@@ -1790,37 +1794,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Question Scores */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 mb-4">
                           {facultyAverages.questionScores.map((q, idx) => (
-                            <div 
-                              key={idx} 
+                            <div
+                              key={idx}
                               className="bg-white rounded-lg p-3 border border-emerald-100 shadow-sm text-center"
                             >
                               <p className="text-xs font-bold text-emerald-600 mb-1">{q.name}</p>
-                              <p className={`text-xl font-bold ${
-                                q.avg >= 4.0 ? 'text-emerald-600' : 
-                                q.avg >= 3.5 ? 'text-blue-600' : 
-                                q.avg >= 3.0 ? 'text-amber-600' : 'text-red-600'
-                              }`}>
-                                {q.avg.toFixed(2)}
+                              <p className={`text-xl font-bold ${q.avg >= 4.0 ? 'text-emerald-600' :
+                                q.avg >= 3.5 ? 'text-blue-600' :
+                                  q.avg >= 3.0 ? 'text-amber-600' : 'text-red-600'
+                                }`}>
+                                {q.avg.toFixed(1)}
                               </p>
                             </div>
                           ))}
-                          
+
                           {/* Overall Average */}
                           <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg p-3 shadow-md text-center col-span-2">
                             <p className="text-xs font-bold text-emerald-100 mb-1">Overall Avg</p>
                             <div className="flex items-center justify-center gap-2">
                               <p className="text-2xl font-bold text-white">
-                                {facultyAverages.overallAvg.toFixed(2)}
+                                {facultyAverages.overallAvg.toFixed(1)}
                               </p>
-                              <span className="text-emerald-200 text-sm">/5.00</span>
+                              <span className="text-emerald-200 text-sm">/5.0</span>
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Comments Section */}
                         {facultyAverages.comments.length > 0 && (
                           <div className="bg-white/70 rounded-lg p-4 border border-emerald-100">
@@ -1849,7 +1852,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         <div className="prose prose-sm prose-indigo max-w-none text-slate-700 space-y-2 whitespace-pre-wrap text-sm leading-relaxed">
                           {aiInsights}
                         </div>
-                        <button 
+                        <button
                           onClick={() => setAiInsights('')}
                           className="mt-4 text-xs font-bold text-indigo-600 hover:underline"
                         >
@@ -1888,8 +1891,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                                   <tr key={idx} className="hover:bg-slate-50 transition">
                                     <td className="px-6 py-4 text-sm font-medium text-slate-700 max-w-xs">{q.question}</td>
                                     <td className="px-6 py-4">
-                                      <span className="text-sm font-bold text-slate-900">{q.score.toFixed(2)}</span>
-                                      <span className="text-xs text-slate-400">/5.00</span>
+                                      <span className="text-sm font-bold text-slate-900">{q.score.toFixed(1)}</span>
+                                      <span className="text-xs text-slate-400">/5.0</span>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600">
                                       {q.validResponses || analytics.totalResponses}
@@ -1927,12 +1930,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         </div>
                       </>
                     ) : viewMode === 'scorecard' ? (
-                      <FacultyScorecard 
-                        data={analytics} 
+                      <FacultyScorecard
+                        data={analytics}
                         searchQuery={globalSearchQuery}
                         onFacultySelect={(facultyName) => {
                           // Apply filter for selected faculty
-                          const facultyKey = Object.keys(dynamicFilters).find(k => 
+                          const facultyKey = Object.keys(dynamicFilters).find(k =>
                             k.toLowerCase().includes('faculty') || k.toLowerCase().includes('teacher')
                           );
                           if (facultyKey) {
@@ -1977,14 +1980,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </button>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Connect Google Sheet Source</h3>
             <p className="text-sm text-slate-500 mb-6">Connect your Google Form response sheet. Ensure the sheet is shared (at least "Anyone with the link can view").</p>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Google Sheet URL</label>
                 <div className="flex gap-2">
-                  <input 
-                    type="url" 
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  <input
+                    type="url"
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                     placeholder="https://docs.google.com/spreadsheets/d/..."
                     value={newSheetUrl}
                     onChange={(e) => { setNewSheetUrl(e.target.value); setSheetValidationResult(null); }}
@@ -2017,9 +2020,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Dataset Name</label>
-                <input 
-                  type="text" 
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                   placeholder="e.g. Autumn Semester 2024 Feedback"
                   value={newSheetName}
                   onChange={(e) => setNewSheetName(e.target.value)}
@@ -2033,7 +2036,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   <strong>Important:</strong> Your Google Sheet must be shared with view access. Go to your sheet &gt; Share &gt; "Anyone with the link" &gt; Viewer.
                 </div>
               </div>
-              <button 
+              <button
                 onClick={handleAddSheet}
                 disabled={!newSheetUrl || !newSheetName}
                 className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-lg transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2064,7 +2067,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 Merge these {mergeSelectedNames.length} names into one. They will appear as a single entry in filters.
               </p>
             </div>
-            
+
             <div className="p-6 overflow-y-auto flex-1">
               <div className="space-y-4">
                 <div>
@@ -2075,95 +2078,95 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         {name}
                       </div>
                     ))}
-                </div>
-              </div>
-              
-              {/* Similar Names Suggestion in Merge Modal */}
-              {(() => {
-                // Find similar names not already in merge list
-                const allOptions = dynamicFilters[mergeCategory] || [];
-                const similarNames: string[] = [];
-                mergeSelectedNames.forEach(selectedName => {
-                  const similar = findSimilarNames(selectedName, allOptions, 0.65);
-                  similar.forEach(s => {
-                    if (!mergeSelectedNames.includes(s) && !similarNames.includes(s)) {
-                      similarNames.push(s);
-                    }
-                  });
-                });
-                
-                if (similarNames.length === 0) return null;
-                
-                return (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="w-4 h-4 text-amber-600" />
-                      <p className="text-xs font-bold text-amber-800">Similar names found!</p>
-                    </div>
-                    <p className="text-[11px] text-amber-700 mb-2">
-                      These names might also be the same person. Click to add them:
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {similarNames.map((name, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setMergeSelectedNames(prev => [...prev, name])}
-                          className="px-2 py-1 text-xs bg-white border border-amber-300 text-amber-700 rounded hover:bg-amber-100 transition flex items-center gap-1"
-                        >
-                          <Plus className="w-3 h-3" />
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => setMergeSelectedNames(prev => [...prev, ...similarNames])}
-                      className="mt-2 w-full py-1.5 text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded transition"
-                    >
-                      Add All Similar Names
-                    </button>
                   </div>
-                );
-              })()}
-              
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Display As (Canonical Name)</label>
-                <select
-                  value={mergeCanonicalName}
-                  onChange={(e) => setMergeCanonicalName(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none mb-2"
-                >
-                  {mergeSelectedNames.map((name, idx) => (
-                    <option key={idx} value={name}>{name}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-slate-400">Or enter a custom name:</p>
-                <input
-                  type="text"
-                  value={mergeCanonicalName}
-                  onChange={(e) => setMergeCanonicalName(e.target.value)}
-                  placeholder="Enter custom display name..."
-                  className="w-full mt-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-
-              <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                <div className="text-xs text-emerald-800 leading-relaxed">
-                  <strong>Note:</strong> Merged names will be saved locally. When filtering, all variants will be treated as "<strong>{mergeCanonicalName || 'the chosen name'}</strong>".
                 </div>
-              </div>
+
+                {/* Similar Names Suggestion in Merge Modal */}
+                {(() => {
+                  // Find similar names not already in merge list
+                  const allOptions = dynamicFilters[mergeCategory] || [];
+                  const similarNames: string[] = [];
+                  mergeSelectedNames.forEach(selectedName => {
+                    const similar = findSimilarNames(selectedName, allOptions, 0.65);
+                    similar.forEach(s => {
+                      if (!mergeSelectedNames.includes(s) && !similarNames.includes(s)) {
+                        similarNames.push(s);
+                      }
+                    });
+                  });
+
+                  if (similarNames.length === 0) return null;
+
+                  return (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                        <p className="text-xs font-bold text-amber-800">Similar names found!</p>
+                      </div>
+                      <p className="text-[11px] text-amber-700 mb-2">
+                        These names might also be the same person. Click to add them:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {similarNames.map((name, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setMergeSelectedNames(prev => [...prev, name])}
+                            className="px-2 py-1 text-xs bg-white border border-amber-300 text-amber-700 rounded hover:bg-amber-100 transition flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" />
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setMergeSelectedNames(prev => [...prev, ...similarNames])}
+                        className="mt-2 w-full py-1.5 text-xs font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded transition"
+                      >
+                        Add All Similar Names
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Display As (Canonical Name)</label>
+                  <select
+                    value={mergeCanonicalName}
+                    onChange={(e) => setMergeCanonicalName(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none mb-2"
+                  >
+                    {mergeSelectedNames.map((name, idx) => (
+                      <option key={idx} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400">Or enter a custom name:</p>
+                  <input
+                    type="text"
+                    value={mergeCanonicalName}
+                    onChange={(e) => setMergeCanonicalName(e.target.value)}
+                    placeholder="Enter custom display name..."
+                    className="w-full mt-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <div className="text-xs text-emerald-800 leading-relaxed">
+                    <strong>Note:</strong> Merged names will be saved locally. When filtering, all variants will be treated as "<strong>{mergeCanonicalName || 'the chosen name'}</strong>".
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Fixed Footer */}
             <div className="p-4 border-t border-slate-100 flex-shrink-0">
               <div className="flex gap-3">
-                <button 
+                <button
                   onClick={() => setShowMergeModal(false)}
                   className="flex-1 py-2.5 border border-slate-300 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   onClick={handleConfirmMerge}
                   disabled={!mergeCanonicalName}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg shadow-lg transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"

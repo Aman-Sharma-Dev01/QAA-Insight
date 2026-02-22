@@ -47,7 +47,7 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
   const handleExportConfirm = async () => {
     let exportAverages = averages;
     let exportOverallAverage = overallAverage;
-    
+
     if (averages.length === 0) {
       // Calculate averages first if not already calculated
       setExportAveragesCalculating(true);
@@ -59,7 +59,7 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
       setExportAveragesCalculating(false);
     }
     setShowExportModal(false);
-    
+
     // Always use Excel export which combines summary + raw data
     if (onExportAverageExcel) {
       onExportAverageExcel(exportAverages, exportOverallAverage);
@@ -73,48 +73,48 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
   const calculateAveragesInternal = async () => {
     try {
       const dataToAnalyze = fetchAllData ? await fetchAllData() : data;
-      
+
       if (dataToAnalyze.length === 0) return;
 
       const questionAverages: QuestionAverage[] = [];
-      
+
       headers.forEach(header => {
         const headerLower = header.toLowerCase().trim();
-        
+
         // Skip short columns (likely identifiers, not questions)
         if (header.trim().length < 15) {
           return;
         }
-        
+
         // Skip metadata columns by exact match or pattern
         const metadataPatterns = [
           'timestamp', 'email', 'school name', 'department', 'semester',
           'class-section', 'name of faculty', 'course name', 'special remark'
         ];
-        
-        const isMetadata = metadataPatterns.some(pattern => 
-          headerLower === pattern || 
+
+        const isMetadata = metadataPatterns.some(pattern =>
+          headerLower === pattern ||
           headerLower.startsWith(pattern) ||
           (headerLower.includes('remark') && headerLower.includes('special'))
         );
-        
+
         if (isMetadata) {
           return;
         }
-        
+
         let sum = 0;
         let count = 0;
-        
+
         dataToAnalyze.forEach(row => {
           const value = row[header];
           const numValue = parseFloat(String(value));
-          
+
           if (!isNaN(numValue) && numValue >= 1 && numValue <= 5) {
             sum += numValue;
             count++;
           }
         });
-        
+
         if (count > 0) {
           questionAverages.push({
             question: header,
@@ -124,13 +124,13 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
           });
         }
       });
-      
+
       let totalAvg = 0;
       if (questionAverages.length > 0) {
         totalAvg = questionAverages.reduce((sum, q) => sum + q.average, 0) / questionAverages.length;
         setOverallAverage(totalAvg);
       }
-      
+
       setAverages(questionAverages);
       return { questionAverages, totalAvg };
     } catch (error) {
@@ -142,76 +142,76 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
   // Calculate averages for all question columns
   const calculateAverages = async () => {
     setCalculatingAverages(true);
-    
+
     try {
       // Fetch all filtered data if available, otherwise use current page data
       const dataToAnalyze = fetchAllData ? await fetchAllData() : data;
-      
+
       if (dataToAnalyze.length === 0) {
         setCalculatingAverages(false);
         return;
       }
 
       const questionAverages: QuestionAverage[] = [];
-      
+
       // Identify question columns (columns with numeric ratings)
       headers.forEach(header => {
         const headerLower = header.toLowerCase().trim();
-        
+
         // Skip short columns (likely identifiers, not questions)
         if (header.trim().length < 15) {
           return;
         }
-        
+
         // Skip metadata columns by exact match or pattern
         const metadataPatterns = [
           'timestamp', 'email', 'school name', 'department', 'semester',
           'class-section', 'name of faculty', 'course name', 'special remark'
         ];
-        
-        const isMetadata = metadataPatterns.some(pattern => 
-          headerLower === pattern || 
+
+        const isMetadata = metadataPatterns.some(pattern =>
+          headerLower === pattern ||
           headerLower.startsWith(pattern) ||
           (headerLower.includes('remark') && headerLower.includes('special'))
         );
-        
+
         if (isMetadata) {
           return;
         }
-      
-      // Check if this column has numeric values (1-5 ratings)
-      let sum = 0;
-      let count = 0;
-      
-      dataToAnalyze.forEach(row => {
-        const value = row[header];
-        const numValue = parseFloat(String(value));
-        
-        if (!isNaN(numValue) && numValue >= 1 && numValue <= 5) {
-          sum += numValue;
-          count++;
+
+        // Check if this column has numeric values (1-5 ratings)
+        let sum = 0;
+        let count = 0;
+
+        dataToAnalyze.forEach(row => {
+          const value = row[header];
+          const numValue = parseFloat(String(value));
+
+          if (!isNaN(numValue) && numValue >= 1 && numValue <= 5) {
+            sum += numValue;
+            count++;
+          }
+        });
+
+        // Only include if we found numeric values
+        if (count > 0) {
+          questionAverages.push({
+            question: header,
+            average: sum / count,
+            count,
+            total: dataToAnalyze.length
+          });
         }
       });
-      
-      // Only include if we found numeric values
-      if (count > 0) {
-        questionAverages.push({
-          question: header,
-          average: sum / count,
-          count,
-          total: dataToAnalyze.length
-        });
+
+      // Calculate overall average (average of all question averages)
+      if (questionAverages.length > 0) {
+        const totalAvg = questionAverages.reduce((sum, q) => sum + q.average, 0) / questionAverages.length;
+        setOverallAverage(totalAvg);
       }
-    });
-    
-    // Calculate overall average (average of all question averages)
-    if (questionAverages.length > 0) {
-      const totalAvg = questionAverages.reduce((sum, q) => sum + q.average, 0) / questionAverages.length;
-      setOverallAverage(totalAvg);
-    }
-    
-    setAverages(questionAverages);
-    setShowAverages(true);
+
+      setAverages(questionAverages);
+      setShowAverages(true);
     } finally {
       setCalculatingAverages(false);
     }
@@ -281,7 +281,7 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-            
+
             {/* Overall Average */}
             <div className="p-6 bg-gradient-to-r from-slate-50 to-indigo-50 border-b border-slate-100">
               <div className="flex items-center justify-between">
@@ -294,7 +294,7 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
                 </div>
                 <div className="text-right">
                   <p className={`text-4xl font-bold ${getRatingColor(overallAverage).split(' ')[0]}`}>
-                    {overallAverage.toFixed(2)}
+                    {overallAverage.toFixed(1)}
                   </p>
                   <p className={`text-sm font-medium ${getRatingColor(overallAverage).split(' ')[0]}`}>
                     {getRatingLabel(overallAverage)}
@@ -319,13 +319,13 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full ${item.average >= 4 ? 'bg-emerald-500' : item.average >= 3 ? 'bg-amber-500' : 'bg-red-500'}`}
                           style={{ width: `${(item.average / 5) * 100}%` }}
                         />
                       </div>
                       <span className={`text-lg font-bold px-2 py-1 rounded ${getRatingColor(item.average)}`}>
-                        {item.average.toFixed(2)}
+                        {item.average.toFixed(1)}
                       </span>
                     </div>
                   </div>
@@ -405,12 +405,12 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
                   <X className="w-5 h-5 text-white" />
                 </button>
               </div>
-              
+
               <div className="p-6 space-y-4">
                 <p className="text-sm text-slate-600 mb-2">
                   Export {pagination.totalRows.toLocaleString()} filtered records.
                 </p>
-                
+
                 {/* Export Description */}
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <div className="flex items-start gap-3">
@@ -438,7 +438,7 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-3 justify-end">
                 <button
                   onClick={() => setShowExportModal(false)}
@@ -468,90 +468,89 @@ const FilteredDataTable: React.FC<FilteredDataTableProps> = ({
           <table className="w-full text-left min-w-max">
             <thead>
               <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
-              <th className="px-4 py-3 text-center w-12">#</th>
-              {displayHeaders.map((header, idx) => (
-                <th key={idx} className="px-4 py-3 max-w-xs truncate" title={header}>
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {data.map((row, rowIdx) => (
-              <tr key={rowIdx} className="hover:bg-slate-50 transition">
-                <td className="px-4 py-3 text-center text-xs text-slate-400">
-                  {((pagination.page - 1) * pagination.pageSize) + rowIdx + 1}
-                </td>
-                {displayHeaders.map((header, colIdx) => (
-                  <td 
-                    key={colIdx} 
-                    className="px-4 py-3 text-sm text-slate-700 max-w-xs truncate"
-                    title={String(row[header] || '')}
-                  >
-                    {String(row[header] || '-')}
-                  </td>
+                <th className="px-4 py-3 text-center w-12">#</th>
+                {displayHeaders.map((header, idx) => (
+                  <th key={idx} className="px-4 py-3 max-w-xs truncate" title={header}>
+                    {header}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
-          <div className="text-sm text-slate-500">
-            Page {pagination.page} of {pagination.totalPages}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onPageChange(pagination.page - 1)}
-              disabled={pagination.page <= 1}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-4 h-4" /> Previous
-            </button>
-            
-            {/* Page numbers */}
-            <div className="hidden sm:flex items-center gap-1">
-              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                let pageNum;
-                if (pagination.totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (pagination.page <= 3) {
-                  pageNum = i + 1;
-                } else if (pagination.page >= pagination.totalPages - 2) {
-                  pageNum = pagination.totalPages - 4 + i;
-                } else {
-                  pageNum = pagination.page - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => onPageChange(pageNum)}
-                    className={`w-8 h-8 text-sm font-medium rounded-lg transition ${
-                      pageNum === pagination.page
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={() => onPageChange(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.map((row, rowIdx) => (
+                <tr key={rowIdx} className="hover:bg-slate-50 transition">
+                  <td className="px-4 py-3 text-center text-xs text-slate-400">
+                    {((pagination.page - 1) * pagination.pageSize) + rowIdx + 1}
+                  </td>
+                  {displayHeaders.map((header, colIdx) => (
+                    <td
+                      key={colIdx}
+                      className="px-4 py-3 text-sm text-slate-700 max-w-xs truncate"
+                      title={String(row[header] || '')}
+                    >
+                      {String(row[header] || '-')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+            <div className="text-sm text-slate-500">
+              Page {pagination.page} of {pagination.totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onPageChange(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" /> Previous
+              </button>
+
+              {/* Page numbers */}
+              <div className="hidden sm:flex items-center gap-1">
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => onPageChange(pageNum)}
+                      className={`w-8 h-8 text-sm font-medium rounded-lg transition ${pageNum === pagination.page
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => onPageChange(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

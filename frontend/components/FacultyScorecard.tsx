@@ -26,7 +26,7 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
 
   // Filter and sort faculty
   const filteredFaculty = data.facultyScores
-    .filter(faculty => 
+    .filter(faculty =>
       faculty.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (faculty.coursesHandled || []).some(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
     )
@@ -80,7 +80,7 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
     else if (score >= 4.0) bgColor = 'bg-green-500';
     else if (score >= 3.5) bgColor = 'bg-blue-500';
     else if (score >= 3.0) bgColor = 'bg-amber-500';
-    
+
     return (
       <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
         <div className={`h-full ${bgColor} transition-all duration-500`} style={{ width: `${percentage}%` }} />
@@ -102,7 +102,7 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
               Comprehensive performance analysis for {rankedFaculty.length} faculty members
             </p>
           </div>
-          
+
           {/* Sort Controls */}
           <div className="flex items-center gap-2 text-xs">
             <span className="text-slate-500">Sort by:</span>
@@ -157,12 +157,12 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
       {/* Faculty List */}
       <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
         {rankedFaculty.map((faculty, index) => (
-          <div 
-            key={faculty.name} 
+          <div
+            key={faculty.name}
             className={`transition-all duration-200 ${expandedFaculty === faculty.name ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
           >
             {/* Main Row */}
-            <div 
+            <div
               className="flex items-center gap-4 p-4 cursor-pointer"
               onClick={() => toggleExpand(faculty.name)}
             >
@@ -170,7 +170,7 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
               <div className="w-16 flex-shrink-0 text-center">
                 {getRankBadge(faculty.rank || index + 1)}
               </div>
-              
+
               {/* Faculty Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -202,16 +202,16 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
               {/* Score */}
               <div className="w-32 flex-shrink-0">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xl font-bold text-slate-800">{faculty.score.toFixed(2)}</span>
-                  <span className="text-xs text-slate-400">/5.00</span>
+                  <span className="text-xl font-bold text-slate-800">{faculty.score.toFixed(1)}</span>
+                  <span className="text-xs text-slate-400">/5.0</span>
                 </div>
                 {getScoreBar(faculty.score)}
               </div>
 
               {/* Expand Icon */}
               <div className="flex-shrink-0">
-                {expandedFaculty === faculty.name ? 
-                  <ChevronUp className="w-5 h-5 text-slate-400" /> : 
+                {expandedFaculty === faculty.name ?
+                  <ChevronUp className="w-5 h-5 text-slate-400" /> :
                   <ChevronDown className="w-5 h-5 text-slate-400" />
                 }
               </div>
@@ -259,7 +259,7 @@ const FacultyScorecard: React.FC<FacultyScorecardProps> = ({ data, searchQuery =
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Overall Score</span>
-                        <span className="font-semibold text-slate-800">{faculty.score.toFixed(2)}/5.00</span>
+                        <span className="font-semibold text-slate-800">{faculty.score.toFixed(1)}/5.0</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Total Feedbacks</span>

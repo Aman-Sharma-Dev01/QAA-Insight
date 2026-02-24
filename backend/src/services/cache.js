@@ -7,16 +7,16 @@ import NodeCache from 'node-cache';
 class CacheService {
   constructor() {
     // Increased TTL for production: 10 minutes default, check every 2 minutes
-    this.cache = new NodeCache({ 
-      stdTTL: 600, 
+    this.cache = new NodeCache({
+      stdTTL: 600,
       checkperiod: 120,
       useClones: false, // Disable cloning for large datasets - improves memory/speed
       maxKeys: 100 // Limit keys to prevent memory bloat
     });
-    
+
     // Track refresh callbacks for background refresh
     this.refreshCallbacks = new Map();
-    
+
     // Listen for expiring keys to trigger background refresh
     this.cache.on('expired', (key, value) => {
       console.log(`Cache expired: ${key.substring(0, 50)}...`);
@@ -71,7 +71,7 @@ class CacheService {
    */
   async getWithBackgroundRefresh(key, refreshCallback, ttl = 600) {
     const cached = this.cache.get(key);
-    
+
     if (cached) {
       // If expiring soon, trigger background refresh
       if (this.isExpiringSoon(key, 120) && refreshCallback) {
@@ -82,7 +82,7 @@ class CacheService {
       }
       return cached;
     }
-    
+
     return null;
   }
 
@@ -108,12 +108,20 @@ class CacheService {
   }
 
   /**
-   * Clear all cached values for a specific sheet URL
+   * Clear all cached values for a specific sheet URL or its extracted ID
    */
   clearForSheet(sheetUrl) {
+    let sheetId = sheetUrl;
+    try {
+      const match = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (match) sheetId = match[1];
+    } catch (e) {
+      // Ignore
+    }
+
     const keys = this.cache.keys();
     keys.forEach(key => {
-      if (key.includes(sheetUrl)) {
+      if (key.includes(sheetUrl) || key.includes(sheetId)) {
         this.cache.del(key);
       }
     });

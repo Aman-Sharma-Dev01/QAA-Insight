@@ -1,9 +1,9 @@
 
-import { 
-  AggregatedData, 
-  ApiResponse, 
-  SheetMetadata, 
-  FilterState, 
+import {
+  AggregatedData,
+  ApiResponse,
+  SheetMetadata,
+  FilterState,
   AuthResponse,
   FilteredDataResponse,
   ExportDataResponse,
@@ -64,11 +64,11 @@ class DataService {
       });
 
       const data = await response.json();
-      
+
       if (data.success && data.data?.token) {
         this.setToken(data.data.token);
       }
-      
+
       return data;
     } catch (error) {
       console.error('Login error:', error);
@@ -88,11 +88,11 @@ class DataService {
       });
 
       const result = await response.json();
-      
+
       if (result.success && result.data?.token) {
         this.setToken(result.data.token);
       }
-      
+
       return result;
     } catch (error) {
       console.error('Register error:', error);
@@ -234,9 +234,9 @@ class DataService {
    * Get paginated filtered data for display
    */
   async getFilteredData(
-    sheetUrl: string, 
-    filters: FilterState, 
-    page: number = 1, 
+    sheetUrl: string,
+    filters: FilterState,
+    page: number = 1,
     pageSize: number = 50
   ): Promise<ApiResponse<FilteredDataResponse>> {
     try {
@@ -485,6 +485,24 @@ class DataService {
     } catch (error) {
       console.error('Delete merge error:', error);
       return { success: false, error: 'Failed to delete merge' };
+    }
+  }
+
+  /**
+   * Apply merge to Google Sheet
+   */
+  async applyMergeToSheet(sheetUrl: string, category: string, canonicalName: string, variants: string[]): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/sheets/apply-merge`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ url: sheetUrl, category, canonicalName, variants })
+      });
+
+      return await response.json();
+    } catch (error) {
+      console.error('Apply merge to sheet error:', error);
+      return { success: false, error: 'Failed to apply merge to Google Sheet' };
     }
   }
 }

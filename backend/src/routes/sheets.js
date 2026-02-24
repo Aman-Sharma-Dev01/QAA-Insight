@@ -26,24 +26,24 @@ function getUserSheets(userId) {
 router.post('/validate', authenticateToken, async (req, res) => {
   try {
     const { url } = req.body;
-    
+
     if (!url) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Sheet URL is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Sheet URL is required'
       });
     }
 
     // Validate URL format
     if (!url.includes('docs.google.com/spreadsheets')) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid Google Sheets URL format' 
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Google Sheets URL format'
       });
     }
 
     const result = await googleSheetsService.validateSheet(url);
-    
+
     if (result.valid) {
       return res.json({
         success: true,
@@ -60,9 +60,9 @@ router.post('/validate', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('Sheet validation error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    return res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -75,11 +75,11 @@ router.post('/add', authenticateToken, (req, res) => {
   try {
     const { name, url } = req.body;
     const userId = req.user.id;
-    
+
     if (!name || !url) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Name and URL are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Name and URL are required'
       });
     }
 
@@ -91,7 +91,7 @@ router.post('/add', authenticateToken, (req, res) => {
     };
 
     const sheets = getUserSheets(userId);
-    
+
     // Check for duplicates
     const exists = sheets.find(s => s.url === url);
     if (exists) {
@@ -100,9 +100,9 @@ router.post('/add', authenticateToken, (req, res) => {
         error: 'This sheet is already added'
       });
     }
-    
+
     sheets.push(newSheet);
-    
+
     // Clear any cached data for this sheet
     cacheService.clearForSheet(url);
 
@@ -112,9 +112,9 @@ router.post('/add', authenticateToken, (req, res) => {
     });
   } catch (error) {
     console.error('Add sheet error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    return res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -126,7 +126,7 @@ router.post('/add', authenticateToken, (req, res) => {
 router.get('/list', authenticateToken, (req, res) => {
   const userId = req.user.id;
   const sheets = getUserSheets(userId);
-  
+
   return res.json({
     success: true,
     data: sheets
@@ -141,13 +141,13 @@ router.delete('/:id', authenticateToken, (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
   const sheets = getUserSheets(userId);
-  
+
   const index = sheets.findIndex(s => s.id === id);
-  
+
   if (index === -1) {
-    return res.status(404).json({ 
-      success: false, 
-      error: 'Sheet not found' 
+    return res.status(404).json({
+      success: false,
+      error: 'Sheet not found'
     });
   }
 
@@ -166,7 +166,7 @@ router.delete('/:id', authenticateToken, (req, res) => {
  */
 router.post('/refresh-cache', authenticateToken, (req, res) => {
   const { url } = req.body;
-  
+
   if (url) {
     cacheService.clearForSheet(url);
   } else {
@@ -187,16 +187,16 @@ router.post('/refresh-cache', authenticateToken, (req, res) => {
 router.post('/check-updates', authenticateToken, async (req, res) => {
   try {
     const { url } = req.body;
-    
+
     if (!url) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Sheet URL is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Sheet URL is required'
       });
     }
 
     const updateInfo = await googleSheetsService.checkForUpdates(url);
-    
+
     // If small change (1-10 rows), automatically refresh cache
     if (updateInfo.shouldInstantRefresh) {
       console.log(`Smart refresh: ${updateInfo.delta} new rows detected, refreshing cache...`);
@@ -210,9 +210,41 @@ router.post('/check-updates', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Check updates error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/sheets/apply-merge
+ * Applies a merge to the Google Sheet by updating all matching rows
+ */
+router.post('/apply-merge', authenticateToken, async (req, res) => {
+  try {
+    const { url, category, canonicalName, variants } = req.body;
+
+    if (!url || !category || !canonicalName || !variants || !Array.isArray(variants)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields for merge (url, category, canonicalName, variants)'
+      });
+    }
+
+    const result = await googleSheetsService.applyMerge(url, category, canonicalName, variants);
+    cacheService.clearForSheet(url); // Also clear cache to reflect updates
+
+    return res.json({
+      success: true,
+      message: 'Merge applied to Google Sheet successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Apply merge error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

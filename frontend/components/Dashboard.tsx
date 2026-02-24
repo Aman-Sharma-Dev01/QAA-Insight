@@ -22,8 +22,8 @@ const STORAGE_KEYS = {
   SAVED_SHEETS: 'eduPulse_savedSheets'
 };
 
-// Type for merged names: category -> { canonicalName: [variant1, variant2, ...] }
-type MergedNamesMapping = Record<string, Record<string, string[]>>;
+// Type for merged names: category -> { canonicalName: { variants: [variant1, variant2, ...], permanent: boolean } }
+type MergedNamesMapping = Record<string, Record<string, { variants: string[], permanent: boolean }>>;
 
 type ViewMode = 'analytics' | 'scorecard' | 'data';
 
@@ -115,6 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [mergeCategory, setMergeCategory] = React.useState<string>('');
   const [mergeSelectedNames, setMergeSelectedNames] = React.useState<string[]>([]);
   const [mergeCanonicalName, setMergeCanonicalName] = React.useState<string>('');
+  const [updateOriginalData, setUpdateOriginalData] = React.useState<boolean>(true);
 
   // Faculty averages state for display
   const [facultyAverages, setFacultyAverages] = React.useState<{
@@ -393,7 +394,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
               // Find canonical name
               let canonicalName = selectedNames[0];
-              for (const [canonical, variants] of Object.entries(categoryMerges)) {
+              for (const [canonical, mergeData] of Object.entries(categoryMerges)) {
+                // Ensure backward compatibility with old data structure which was just a string array
+                const isOldFormat = Array.isArray(mergeData);
+                const variants = isOldFormat ? (mergeData as unknown as string[]) : (mergeData as { variants: string[] }).variants || [];
                 if (selectedNames.some(name => variants.includes(name) || canonical === name)) {
                   canonicalName = canonical;
                   break;
@@ -473,29 +477,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   }, [activeSheet, filterState]);
 
   // Apply merge mapping to filter options - returns deduplicated options with canonical names
-  const getDisplayOptions = React.useCallback((category: string, options: string[]): { displayName: string; originalNames: string[] }[] => {
+  const getDisplayOptions = React.useCallback((category: string, options: string[]): { displayName: string; originalNames: string[]; permanent: boolean }[] => {
     const categoryMerges = mergedNames[category] || {};
-    const displayMap = new Map<string, string[]>();
+    const displayMap = new Map<string, { originalNames: string[]; permanent: boolean }>();
 
     options.forEach(opt => {
       let foundCanonical = opt;
+      let isPermanent = false;
       // Check if this option is a variant
-      for (const [canonical, variants] of Object.entries(categoryMerges)) {
+      for (const [canonical, mergeData] of Object.entries(categoryMerges)) {
+        const isOldFormat = Array.isArray(mergeData);
+        const variants = isOldFormat ? (mergeData as unknown as string[]) : (mergeData as { variants: string[] }).variants || [];
         if (variants.includes(opt) || canonical === opt) {
           foundCanonical = canonical;
+          isPermanent = isOldFormat ? false : (mergeData as { permanent?: boolean }).permanent || false;
           break;
         }
       }
 
       if (!displayMap.has(foundCanonical)) {
-        displayMap.set(foundCanonical, []);
+        displayMap.set(foundCanonical, { originalNames: [], permanent: isPermanent });
       }
-      displayMap.get(foundCanonical)!.push(opt);
+      displayMap.get(foundCanonical)!.originalNames.push(opt);
     });
 
-    return Array.from(displayMap.entries()).map(([displayName, originalNames]) => ({
+    return Array.from(displayMap.entries()).map(([displayName, data]) => ({
       displayName,
-      originalNames
+      originalNames: data.originalNames,
+      permanent: data.permanent
     }));
   }, [mergedNames]);
 
@@ -517,17 +526,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
     // Remove any existing merges that include these names
     for (const canonical of Object.keys(categoryMerges)) {
-      categoryMerges[canonical] = categoryMerges[canonical].filter(
-        v => !mergeSelectedNames.includes(v)
-      );
-      // Remove empty entries
-      if (categoryMerges[canonical].length === 0) {
-        delete categoryMerges[canonical];
+      if (categoryMerges[canonical] && categoryMerges[canonical].variants) {
+        categoryMerges[canonical].variants = categoryMerges[canonical].variants.filter(
+          v => !mergeSelectedNames.includes(v)
+        );
+        // Remove empty entries
+        if (categoryMerges[canonical].variants.length === 0) {
+          delete categoryMerges[canonical];
+        }
       }
     }
 
     // Add new merge with all selected names as variants
-    categoryMerges[mergeCanonicalName] = [...mergeSelectedNames];
+    categoryMerges[mergeCanonicalName] = {
+      variants: [...mergeSelectedNames],
+      permanent: updateOriginalData
+    };
     newMergedNames[mergeCategory] = categoryMerges;
 
     // Update local state immediately
@@ -544,11 +558,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       return { ...prev, [mergeCategory]: newValues };
     });
 
-    // Save to backend
+    // Save to backend and apply to Google Sheets
+    setMergedNamesLoading(true);
     try {
       await dataService.updateMergedNames(activeSheet.id, newMergedNames);
+
+      if (updateOriginalData) {
+        // Apply the merge directly to the Google Sheet
+        await dataService.applyMergeToSheet(
+          activeSheet.url,
+          mergeCategory,
+          mergeCanonicalName,
+          mergeSelectedNames
+        );
+      }
+
+      // Refresh data to reflect the changes from the sheet
+      refreshData(true);
     } catch (err) {
-      console.error('Failed to save merged names:', err);
+      console.error('Failed to save merged names or apply to sheet:', err);
+    } finally {
+      setMergedNamesLoading(false);
     }
 
     setShowMergeModal(false);
@@ -572,8 +602,51 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     // Save to backend
     try {
       await dataService.updateMergedNames(activeSheet.id, newMergedNames);
+      refreshData();
     } catch (err) {
       console.error('Failed to save unmerge:', err);
+    }
+  };
+
+  // Handle making a local merge permanent
+  const handleMakePermanent = async (category: string, canonicalName: string, originalNames: string[]) => {
+    if (!activeSheet?.id || !activeSheet?.url) return;
+
+    setMergedNamesLoading(true);
+    try {
+      // 1. Apply to Google Sheets
+      await dataService.applyMergeToSheet(
+        activeSheet.url,
+        category,
+        canonicalName,
+        originalNames
+      );
+
+      // 2. Update local state to mark as permanent
+      const newMergedNames = { ...mergedNames };
+      if (!newMergedNames[category]) newMergedNames[category] = {};
+
+      if (newMergedNames[category][canonicalName]) {
+        newMergedNames[category][canonicalName].permanent = true;
+      } else {
+        // Fallback in case it wasn't properly structured
+        newMergedNames[category][canonicalName] = {
+          variants: originalNames,
+          permanent: true
+        };
+      }
+
+      setMergedNames(newMergedNames);
+
+      // 3. Save updated state to backend
+      await dataService.updateMergedNames(activeSheet.id, newMergedNames);
+
+      // 4. Refresh data
+      refreshData(true);
+    } catch (err) {
+      console.error('Failed to make merge permanent:', err);
+    } finally {
+      setMergedNamesLoading(false);
     }
   };
 
@@ -1447,33 +1520,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                       {/* Show selected options first with highlight */}
                       {selectedDisplayOptions.length > 0 && (
                         <>
-                          {selectedDisplayOptions.map(({ displayName, originalNames }) => {
+                          {selectedDisplayOptions.map(({ displayName, originalNames, permanent }) => {
                             const isMerged = originalNames.length > 1;
                             return (
                               <div key={displayName} className="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 rounded cursor-pointer transition border-l-2 border-indigo-500">
-                                <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                                <label className="flex items-center gap-2 flex-1 cursor-pointer min-w-0">
                                   <input
                                     type="checkbox"
                                     checked={true}
                                     onChange={() => handleMergedOptionChange(displayName, originalNames)}
-                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 flex-shrink-0"
                                   />
                                   <span className="text-sm text-indigo-700 font-medium truncate">{displayName}</span>
                                   {isMerged && (
-                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title={`Merged: ${originalNames.join(', ')}`}>
+                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold flex-shrink-0" title={`Merged: ${originalNames.join(', ')}`}>
                                       +{originalNames.length - 1}
                                     </span>
                                   )}
                                 </label>
-                                {isMerged && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleUnmerge(category, displayName); }}
-                                    className="flex items-center gap-0.5 text-[9px] text-red-400 hover:text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded transition"
-                                    title={`Unmerge: ${originalNames.join(', ')}`}
-                                  >
-                                    <X className="w-3 h-3" />
-                                    <span className="font-medium">Unmerge</span>
-                                  </button>
+                                {isMerged && !permanent && (
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleMakePermanent(category, displayName, originalNames); }}
+                                      className="flex items-center gap-0.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition whitespace-nowrap"
+                                      title={`Make Permanent in Google Sheets: ${originalNames.join(', ')}`}
+                                      disabled={mergedNamesLoading}
+                                    >
+                                      <Database className="w-3 h-3 flex-shrink-0" />
+                                      <span className="font-medium whitespace-nowrap">Make Permanent</span>
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleUnmerge(category, displayName); }}
+                                      className="flex items-center gap-0.5 text-[9px] text-red-400 hover:text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded transition whitespace-nowrap"
+                                      title={`Unmerge: ${originalNames.join(', ')}`}
+                                      disabled={mergedNamesLoading}
+                                    >
+                                      <X className="w-3 h-3 flex-shrink-0" />
+                                      <span className="font-medium whitespace-nowrap">Unmerge</span>
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             );
@@ -1486,33 +1571,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
                       {/* Unselected options */}
                       {unselectedDisplayOptions.length > 0 ? (
-                        unselectedDisplayOptions.map(({ displayName, originalNames }) => {
+                        unselectedDisplayOptions.map(({ displayName, originalNames, permanent }) => {
                           const isMerged = originalNames.length > 1;
                           return (
                             <div key={displayName} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer transition">
-                              <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                              <label className="flex items-center gap-2 flex-1 cursor-pointer min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={false}
                                   onChange={() => handleMergedOptionChange(displayName, originalNames)}
-                                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 flex-shrink-0"
                                 />
                                 <span className="text-sm text-slate-600 truncate">{displayName}</span>
                                 {isMerged && (
-                                  <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold" title={`Merged: ${originalNames.join(', ')}`}>
+                                  <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold flex-shrink-0" title={`Merged: ${originalNames.join(', ')}`}>
                                     +{originalNames.length - 1}
                                   </span>
                                 )}
                               </label>
-                              {isMerged && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUnmerge(category, displayName); }}
-                                  className="flex items-center gap-0.5 text-[9px] text-red-400 hover:text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded transition"
-                                  title={`Unmerge: ${originalNames.join(', ')}`}
-                                >
-                                  <X className="w-3 h-3" />
-                                  <span className="font-medium">Unmerge</span>
-                                </button>
+                              {isMerged && !permanent && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleMakePermanent(category, displayName, originalNames); }}
+                                    className="flex items-center gap-0.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition whitespace-nowrap"
+                                    title={`Make Permanent in Google Sheets: ${originalNames.join(', ')}`}
+                                    disabled={mergedNamesLoading}
+                                  >
+                                    <Database className="w-3 h-3 flex-shrink-0" />
+                                    <span className="font-medium whitespace-nowrap">Make Permanent</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleUnmerge(category, displayName); }}
+                                    className="flex items-center gap-0.5 text-[9px] text-red-400 hover:text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded transition whitespace-nowrap"
+                                    title={`Unmerge: ${originalNames.join(', ')}`}
+                                    disabled={mergedNamesLoading}
+                                  >
+                                    <X className="w-3 h-3 flex-shrink-0" />
+                                    <span className="font-medium whitespace-nowrap">Unmerge</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           );
@@ -1689,7 +1786,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     </p>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => refreshData()}
+                      disabled={!activeSheet || loading}
+                      className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Update Now
+                    </button>
+
+                    <button
+                      onClick={() => { setFilterState({}); setFilterSearchQueries({}); }}
+                      disabled={activeFilterCount === 0 && Object.keys(filterSearchQueries).length === 0}
+                      className="flex items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <X className="w-4 h-4" /> Clear Filters
+                    </button>
+
+                    <div className="w-px h-8 bg-slate-200 mx-1 self-center hidden sm:block"></div>
+
                     {/* View Mode Toggle - Analytics and Scorecard commented out for now */}
                     <div className="flex bg-white border border-slate-200 rounded-lg p-1">
                       {/* 
@@ -2169,9 +2284,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </div>
 
                 <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                  <div className="text-xs text-emerald-800 leading-relaxed">
+                  <div className="text-xs text-emerald-800 leading-relaxed mb-3">
                     <strong>Note:</strong> Merged names will be saved locally. When filtering, all variants will be treated as "<strong>{mergeCanonicalName || 'the chosen name'}</strong>".
                   </div>
+
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                      checked={updateOriginalData}
+                      onChange={(e) => setUpdateOriginalData(e.target.checked)}
+                    />
+                    <span className="text-xs text-emerald-900 leading-relaxed font-semibold">
+                      Also change original data in Google Sheets (replaces variant names with canonical name permanently).
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>

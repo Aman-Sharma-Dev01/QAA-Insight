@@ -67,7 +67,7 @@ const FILTER_KEYWORDS = [
  * More specific patterns to avoid false positives (e.g., "Course Name" should NOT be excluded)
  */
 const EXCLUDE_KEYWORDS = [
-  'timestamp', 'email address', 'student name', 'roll no', 'roll number', 
+  'timestamp', 'email address', 'student name', 'roll no', 'roll number',
   'phone', 'mobile', 'contact'
 ];
 
@@ -104,14 +104,14 @@ class AnalyticsService {
    */
   async getSheetMetadata(sheetUrl) {
     const cacheKey = `metadata_${sheetUrl}`;
-    
+
     // Use background refresh for metadata
     const cached = await cacheService.getWithBackgroundRefresh(
       cacheKey,
       async () => this.buildMetadata(sheetUrl),
       METADATA_CACHE_TTL
     );
-    
+
     if (cached) {
       return cached;
     }
@@ -127,33 +127,15 @@ class AnalyticsService {
     const startTime = Date.now();
 
     const { headers, data } = await googleSheetsService.getSheetData(sheetUrl);
-    
-    // Find faculty column for name normalization
-    const facultyColumn = headers.find(h => 
-      h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher')
-    );
-    
-    // Get or create name mapping for faculty names
-    let nameMapping = null;
-    if (facultyColumn) {
-      const nameMappingCacheKey = `namemapping_${sheetUrl}`;
-      nameMapping = cacheService.get(nameMappingCacheKey);
-      
-      if (!nameMapping) {
-        nameMapping = createNameMapping(data, facultyColumn);
-        cacheService.set(nameMappingCacheKey, nameMapping, NAME_MAPPING_CACHE_TTL);
-        console.log(`Name normalization for metadata: ${nameMapping.totalOriginal} → ${nameMapping.totalNormalized} names`);
-      }
-    }
-    
+
     // Identify filter columns - optimized with Set lookups
     const filters = {};
     const headerCount = headers.length;
-    
+
     for (let i = 0; i < headerCount; i++) {
       const header = headers[i];
       const headerLower = header.toLowerCase().trim();
-      
+
       // First check if it's a filterable column (filter takes priority)
       let isFilterable = false;
       for (const keyword of FILTER_KEYWORDS) {
@@ -162,13 +144,13 @@ class AnalyticsService {
           break;
         }
       }
-      
+
       // If it's filterable, don't exclude it
       // If not filterable, check exclusions and skip this column
       if (!isFilterable) {
         // Skip if exact match with excluded terms
         if (EXCLUDE_EXACT.includes(headerLower)) continue;
-        
+
         // Skip if contains excluded keywords
         let isExcluded = false;
         for (const keyword of EXCLUDE_KEYWORDS) {
@@ -178,18 +160,18 @@ class AnalyticsService {
           }
         }
         if (isExcluded) continue;
-        
+
         // Not filterable and not excluded - skip (we only want filter columns)
         continue;
       }
-      
+
       // Column is filterable - extract unique values
       const uniqueSet = new Set();
       const dataLen = data.length;
-      
+
       // Check if this is the faculty column - show ALL original names (not normalized)
       // Name normalization will be applied during filtering, not here
-      
+
       for (let j = 0; j < dataLen; j++) {
         let val = data[j][header];
         if (val !== undefined && val !== null && val !== '') {
@@ -198,7 +180,7 @@ class AnalyticsService {
           uniqueSet.add(val);
         }
       }
-      
+
       if (uniqueSet.size > 0 && uniqueSet.size <= 500) {
         filters[header] = Array.from(uniqueSet).sort();
       }
@@ -208,17 +190,14 @@ class AnalyticsService {
       headers,
       filters,
       totalRows: data.length,
-      nameNormalization: nameMapping ? {
-        originalCount: nameMapping.totalOriginal,
-        normalizedCount: nameMapping.totalNormalized
-      } : null
+      nameNormalization: null
     };
 
     console.log(`Built metadata for ${data.length} rows in ${Date.now() - startTime}ms`);
-    
+
     // Cache with new TTL
     cacheService.set(cacheKey, metadata, METADATA_CACHE_TTL);
-    
+
     return metadata;
   }
 
@@ -228,14 +207,14 @@ class AnalyticsService {
   async getAnalytics(sheetUrl, filters = {}) {
     const filterKey = Object.keys(filters).length > 0 ? JSON.stringify(filters) : 'all';
     const cacheKey = `analytics_${sheetUrl}_${filterKey}`;
-    
+
     // Use background refresh for analytics
     const cached = await cacheService.getWithBackgroundRefresh(
       cacheKey,
       async () => this.computeAnalytics(sheetUrl, filters),
       ANALYTICS_CACHE_TTL
     );
-    
+
     if (cached) {
       return cached;
     }
@@ -252,56 +231,29 @@ class AnalyticsService {
     const startTime = Date.now();
 
     const { headers, data } = await googleSheetsService.getSheetData(sheetUrl);
-    
-    // Find faculty column and normalize names
-    const facultyColumn = headers.find(h => 
+
+    // Find faculty column 
+    const facultyColumn = headers.find(h =>
       h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher')
     );
-    
+
     let processedData = data;
-    let nameNormalizationInfo = null;
     let nameMapping = null;
-    
-    if (facultyColumn) {
-      // Get or create name mapping
-      const nameMappingCacheKey = `namemapping_${sheetUrl}`;
-      nameMapping = cacheService.get(nameMappingCacheKey);
-      
-      if (!nameMapping) {
-        console.log('Creating name mapping for faculty names...');
-        nameMapping = createNameMapping(data, facultyColumn);
-        cacheService.set(nameMappingCacheKey, nameMapping, NAME_MAPPING_CACHE_TTL);
-        console.log(`Name normalization: ${nameMapping.totalOriginal} original names → ${nameMapping.totalNormalized} normalized names`);
-      }
-      
-      // Apply name mapping to data (normalize faculty names for analytics)
-      processedData = applyNameMapping(data, facultyColumn, nameMapping.mapping);
-      nameNormalizationInfo = {
-        originalCount: nameMapping.totalOriginal,
-        normalizedCount: nameMapping.totalNormalized,
-        groups: nameMapping.groups
-      };
-    }
-    
-    // Apply filters (pass nameMapping so filter values expand to include all variants)
+
+    // Apply filters strictly
     let filteredData = this.applyFilters(processedData, filters, nameMapping, facultyColumn);
-    
+
     // Identify question columns (columns with Likert-scale responses)
     const questionColumns = this.identifyQuestionColumns(headers, filteredData);
-    
+
     // Calculate analytics
     const analytics = this.calculateAnalytics(filteredData, headers, questionColumns);
-    
-    // Add name normalization info if available
-    if (nameNormalizationInfo) {
-      analytics.nameNormalization = nameNormalizationInfo;
-    }
-    
+
     console.log(`Computed analytics for ${filteredData.length} rows in ${Date.now() - startTime}ms`);
-    
+
     // Cache with new TTL
     cacheService.set(cacheKey, analytics, ANALYTICS_CACHE_TTL);
-    
+
     return analytics;
   }
 
@@ -312,49 +264,49 @@ class AnalyticsService {
   async getFilteredData(sheetUrl, filters = {}, page = 1, pageSize = 100) {
     const filterKey = Object.keys(filters).length > 0 ? JSON.stringify(filters) : 'all';
     const cacheKey = `filtered_${sheetUrl}_${filterKey}`;
-    
+
     // Try to get cached filtered results (without pagination)
     let filteredData = cacheService.get(cacheKey);
     let headers;
-    
+
     if (!filteredData) {
       const sheetData = await googleSheetsService.getSheetData(sheetUrl);
       headers = sheetData.headers;
-      
+
       // Get name mapping for faculty column (for filter expansion)
-      const facultyColumn = headers.find(h => 
+      const facultyColumn = headers.find(h =>
         h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher')
       );
-      
+
       let nameMapping = null;
       if (facultyColumn) {
         const nameMappingCacheKey = `namemapping_${sheetUrl}`;
         nameMapping = cacheService.get(nameMappingCacheKey);
-        
+
         if (!nameMapping) {
           nameMapping = createNameMapping(sheetData.data, facultyColumn);
           cacheService.set(nameMappingCacheKey, nameMapping, NAME_MAPPING_CACHE_TTL);
         }
       }
-      
+
       // Don't normalize data - show original names
       // But pass nameMapping to applyFilters so faculty filter expands to all variants
       filteredData = this.applyFilters(sheetData.data, filters, nameMapping, facultyColumn);
-      
+
       // Cache filtered results for quick pagination
       cacheService.set(cacheKey, { headers, filteredData }, FILTERED_DATA_CACHE_TTL);
     } else {
       headers = filteredData.headers;
       filteredData = filteredData.filteredData;
     }
-    
+
     // Pagination - very fast on cached data
     const totalRows = filteredData.length;
     const totalPages = Math.ceil(totalRows / pageSize);
     const startIndex = (page - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     const paginatedData = filteredData.slice(startIndex, endIndex);
-    
+
     return {
       headers,
       data: paginatedData,
@@ -373,27 +325,27 @@ class AnalyticsService {
    */
   async getFilteredDataForExport(sheetUrl, filters = {}) {
     const { headers, data } = await googleSheetsService.getSheetData(sheetUrl);
-    
+
     // Get name mapping for faculty column (for filter expansion)
-    const facultyColumn = headers.find(h => 
+    const facultyColumn = headers.find(h =>
       h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher')
     );
-    
+
     let nameMapping = null;
     if (facultyColumn) {
       const nameMappingCacheKey = `namemapping_${sheetUrl}`;
       nameMapping = cacheService.get(nameMappingCacheKey);
-      
+
       if (!nameMapping) {
         nameMapping = createNameMapping(data, facultyColumn);
         cacheService.set(nameMappingCacheKey, nameMapping, NAME_MAPPING_CACHE_TTL);
       }
     }
-    
+
     // Don't normalize data - export original names
     // But use nameMapping for filter expansion
     const filteredData = this.applyFilters(data, filters, nameMapping, facultyColumn);
-    
+
     return {
       headers,
       data: filteredData,
@@ -406,11 +358,11 @@ class AnalyticsService {
    */
   async getNameMappings(sheetUrl) {
     const { headers, data } = await googleSheetsService.getSheetData(sheetUrl);
-    
-    const facultyColumn = headers.find(h => 
+
+    const facultyColumn = headers.find(h =>
       h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher')
     );
-    
+
     if (!facultyColumn) {
       return {
         success: false,
@@ -418,15 +370,15 @@ class AnalyticsService {
         mappings: []
       };
     }
-    
+
     const nameMappingCacheKey = `namemapping_${sheetUrl}`;
     let nameMapping = cacheService.get(nameMappingCacheKey);
-    
+
     if (!nameMapping) {
       nameMapping = createNameMapping(data, facultyColumn);
       cacheService.set(nameMappingCacheKey, nameMapping, NAME_MAPPING_CACHE_TTL);
     }
-    
+
     return {
       success: true,
       facultyColumn,
@@ -446,12 +398,12 @@ class AnalyticsService {
   async clearNameMappingCache(sheetUrl) {
     const cacheKey = `namemapping_${sheetUrl}`;
     cacheService.delete(cacheKey);
-    
+
     // Also clear related caches
     cacheService.clearByPrefix(`metadata_${sheetUrl}`);
     cacheService.clearByPrefix(`analytics_${sheetUrl}`);
     cacheService.clearByPrefix(`filtered_${sheetUrl}`);
-    
+
     return { success: true, message: 'Name mapping cache cleared' };
   }
 
@@ -465,54 +417,40 @@ class AnalyticsService {
     }
 
     const startTime = Date.now();
-    
-    // Build expanded filter entries - for faculty column, expand to include all similar names
+
+    // Build expanded filter entries
+    // Remove auto-expansion for faculty names to prevent merging distinct identities in the frontend
     const filterEntries = Object.entries(filters)
       .filter(([key, values]) => values && values.length > 0)
-      .map(([key, values]) => {
-        // If this is the faculty column and we have name mapping, expand values
-        if (key === facultyColumn && nameMapping && nameMapping.reverseMapping) {
-          const expandedValues = new Set();
-          for (const selectedName of values) {
-            // Get canonical name for selected value
-            const canonicalName = nameMapping.mapping[selectedName] || selectedName;
-            // Get all variants that map to this canonical name
-            const variants = nameMapping.reverseMapping[canonicalName] || [selectedName];
-            variants.forEach(v => expandedValues.add(v));
-          }
-          console.log(`Faculty filter expanded: ${values.length} selected → ${expandedValues.size} variants`);
-          return [key, expandedValues];
-        }
-        return [key, new Set(values)];
-      });
-    
+      .map(([key, values]) => [key, new Set(values)]);
+
     if (filterEntries.length === 0) {
       return data;
     }
 
     const dataLen = data.length;
     const result = [];
-    
+
     // Optimized loop with early exits
     for (let i = 0; i < dataLen; i++) {
       const row = data[i];
       let matches = true;
-      
+
       for (let j = 0; j < filterEntries.length; j++) {
         const [key, valueSet] = filterEntries[j];
         const cellValue = String(row[key] || '').trim();
-        
+
         if (!valueSet.has(cellValue)) {
           matches = false;
           break; // Early exit on first non-match
         }
       }
-      
+
       if (matches) {
         result.push(row);
       }
     }
-    
+
     console.log(`Filtered ${dataLen} → ${result.length} rows in ${Date.now() - startTime}ms`);
     return result;
   }
@@ -523,57 +461,57 @@ class AnalyticsService {
   identifyQuestionColumns(headers, data) {
     const questionColumns = [];
     const sampleSize = Math.min(100, data.length);
-    
+
     // Metadata columns to exclude
     const metadataPatterns = [
       'timestamp', 'email', 'school name', 'department', 'semester',
       'class-section', 'name of faculty', 'course name', 'special remark'
     ];
-    
+
     for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
       const headerLower = header.toLowerCase().trim();
-      
+
       // Skip short columns (likely identifiers, not questions) - must be at least 15 chars
       if (header.trim().length < 15) {
         continue;
       }
-      
+
       // Skip metadata columns
-      const isMetadata = metadataPatterns.some(pattern => 
-        headerLower === pattern || 
+      const isMetadata = metadataPatterns.some(pattern =>
+        headerLower === pattern ||
         headerLower.startsWith(pattern) ||
         (headerLower.includes('remark') && headerLower.includes('special'))
       );
-      
+
       if (isMetadata) {
         continue;
       }
-      
+
       // Check sample values for Likert responses or numeric ratings
       let hasLikertResponses = false;
       let hasNumericRatings = false;
-      
+
       for (let j = 0; j < sampleSize; j++) {
         const val = String(data[j][header] || '').toLowerCase().trim();
-        
+
         if (LIKERT_MAPPING.has(val)) {
           hasLikertResponses = true;
           break;
         }
-        
+
         const num = parseFloat(val);
         if (!isNaN(num) && num >= 1 && num <= 5) {
           hasNumericRatings = true;
         }
       }
-      
+
       // Include if it has Likert or numeric responses
       if (hasLikertResponses || hasNumericRatings) {
         questionColumns.push(header);
       }
     }
-    
+
     return questionColumns;
   }
 
@@ -582,7 +520,7 @@ class AnalyticsService {
    */
   calculateAnalytics(data, headers, questionColumns) {
     const totalResponses = data.length;
-    
+
     if (totalResponses === 0) {
       return {
         totalResponses: 0,
@@ -607,7 +545,7 @@ class AnalyticsService {
 
     // Calculate question scores with descriptions
     const questionScores = this.calculateQuestionScores(data, questionColumns);
-    
+
     // Calculate overall average
     const averageRating = questionScores.length > 0
       ? questionScores.reduce((sum, q) => sum + q.score, 0) / questionScores.length
@@ -615,37 +553,37 @@ class AnalyticsService {
 
     // Calculate department-wise scores
     const departmentWise = this.calculateGroupScores(data, headers, 'department', questionColumns);
-    
+
     // Calculate faculty scores with detailed information
     const facultyScores = this.calculateFacultyScores(data, headers, questionColumns);
-    
+
     // Calculate section-wise scores
     const sectionWise = this.calculateSectionScores(data, headers, questionColumns);
-    
+
     // Calculate course-wise scores
     const courseWise = this.calculateCourseScores(data, headers, questionColumns);
-    
+
     // Calculate semester-wise scores
     const semesterWise = this.calculateSemesterScores(data, headers, questionColumns);
-    
+
     // Calculate time trends
     const timeTrends = this.calculateTimeTrends(data, headers, questionColumns);
-    
+
     // Get unique counts
     const uniqueFaculty = new Set();
     const uniqueCourses = new Set();
     const uniqueSections = new Set();
-    
+
     const facultyCol = headers.find(h => h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher'));
     const courseCol = headers.find(h => h.toLowerCase().includes('course') || h.toLowerCase().includes('subject'));
     const sectionCol = headers.find(h => h.toLowerCase().includes('section') || h.toLowerCase().includes('class'));
-    
+
     data.forEach(row => {
       if (facultyCol && row[facultyCol]) uniqueFaculty.add(String(row[facultyCol]).trim());
       if (courseCol && row[courseCol]) uniqueCourses.add(String(row[courseCol]).trim());
       if (sectionCol && row[sectionCol]) uniqueSections.add(String(row[sectionCol]).trim());
     });
-    
+
     // Top performers and needs improvement
     const sortedFaculty = [...facultyScores].sort((a, b) => b.score - a.score);
     const topPerformers = sortedFaculty.slice(0, 5);
@@ -677,37 +615,37 @@ class AnalyticsService {
    */
   calculateFacultyScores(data, headers, questionColumns) {
     // Find the faculty column
-    const facultyColumn = headers.find(h => 
+    const facultyColumn = headers.find(h =>
       h.toLowerCase().includes('faculty') || h.toLowerCase().includes('teacher')
     );
-    
-    const courseColumn = headers.find(h => 
+
+    const courseColumn = headers.find(h =>
       h.toLowerCase().includes('course') || h.toLowerCase().includes('subject')
     );
-    
-    const sectionColumn = headers.find(h => 
+
+    const sectionColumn = headers.find(h =>
       h.toLowerCase().includes('section') || h.toLowerCase().includes('class')
     );
-    
+
     if (!facultyColumn || questionColumns.length === 0) {
       return [];
     }
 
     const facultyData = {};
-    
+
     data.forEach(row => {
       const facultyName = String(row[facultyColumn] || '').trim();
       if (!facultyName) return;
-      
+
       if (!facultyData[facultyName]) {
-        facultyData[facultyName] = { 
-          scores: [], 
+        facultyData[facultyName] = {
+          scores: [],
           count: 0,
           courses: new Set(),
           sections: new Set()
         };
       }
-      
+
       // Track courses and sections
       if (courseColumn && row[courseColumn]) {
         facultyData[facultyName].courses.add(String(row[courseColumn]).trim());
@@ -715,28 +653,28 @@ class AnalyticsService {
       if (sectionColumn && row[sectionColumn]) {
         facultyData[facultyName].sections.add(String(row[sectionColumn]).trim());
       }
-      
+
       // Calculate average score across all questions for this row
       let rowScore = 0;
       let validQuestions = 0;
-      
+
       questionColumns.forEach(q => {
         const rawValue = row[q];
         let score;
-        
+
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
         } else {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           rowScore += score;
           validQuestions++;
         }
       });
-      
+
       if (validQuestions > 0) {
         facultyData[facultyName].scores.push(rowScore / validQuestions);
         facultyData[facultyName].count++;
@@ -753,12 +691,12 @@ class AnalyticsService {
         rating: getRatingLabel(scores.reduce((a, b) => a + b, 0) / scores.length)
       }))
       .sort((a, b) => b.score - a.score);
-    
+
     // Assign ranks
     facultyScores.forEach((f, idx) => {
       f.rank = idx + 1;
     });
-    
+
     return facultyScores;
   }
 
@@ -766,63 +704,63 @@ class AnalyticsService {
    * Calculate section-wise scores
    */
   calculateSectionScores(data, headers, questionColumns) {
-    const sectionColumn = headers.find(h => 
+    const sectionColumn = headers.find(h =>
       h.toLowerCase().includes('section') || h.toLowerCase().includes('class')
     );
-    
-    const semesterColumn = headers.find(h => 
+
+    const semesterColumn = headers.find(h =>
       h.toLowerCase().includes('semester')
     );
-    
-    const courseColumn = headers.find(h => 
+
+    const courseColumn = headers.find(h =>
       h.toLowerCase().includes('course') || h.toLowerCase().includes('subject')
     );
-    
+
     if (!sectionColumn || questionColumns.length === 0) {
       return [];
     }
 
     const sectionData = {};
-    
+
     data.forEach(row => {
       const section = String(row[sectionColumn] || '').trim();
       const semester = semesterColumn ? String(row[semesterColumn] || '').trim() : '';
       const course = courseColumn ? String(row[courseColumn] || '').trim() : '';
-      
+
       if (!section) return;
-      
+
       const key = `${section}|${semester}|${course}`;
-      
+
       if (!sectionData[key]) {
-        sectionData[key] = { 
+        sectionData[key] = {
           section,
           semester,
           course,
-          scores: [], 
+          scores: [],
           count: 0
         };
       }
-      
+
       let rowScore = 0;
       let validQuestions = 0;
-      
+
       questionColumns.forEach(q => {
         const rawValue = row[q];
         let score;
-        
+
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
         } else {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           rowScore += score;
           validQuestions++;
         }
       });
-      
+
       if (validQuestions > 0) {
         sectionData[key].scores.push(rowScore / validQuestions);
         sectionData[key].count++;
@@ -844,56 +782,56 @@ class AnalyticsService {
    * Calculate course-wise scores
    */
   calculateCourseScores(data, headers, questionColumns) {
-    const courseColumn = headers.find(h => 
+    const courseColumn = headers.find(h =>
       h.toLowerCase().includes('course') || h.toLowerCase().includes('subject')
     );
-    
-    const sectionColumn = headers.find(h => 
+
+    const sectionColumn = headers.find(h =>
       h.toLowerCase().includes('section') || h.toLowerCase().includes('class')
     );
-    
+
     if (!courseColumn || questionColumns.length === 0) {
       return [];
     }
 
     const courseData = {};
-    
+
     data.forEach(row => {
       const course = String(row[courseColumn] || '').trim();
       if (!course) return;
-      
+
       if (!courseData[course]) {
-        courseData[course] = { 
-          scores: [], 
+        courseData[course] = {
+          scores: [],
           count: 0,
           sections: new Set()
         };
       }
-      
+
       if (sectionColumn && row[sectionColumn]) {
         courseData[course].sections.add(String(row[sectionColumn]).trim());
       }
-      
+
       let rowScore = 0;
       let validQuestions = 0;
-      
+
       questionColumns.forEach(q => {
         const rawValue = row[q];
         let score;
-        
+
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
         } else {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           rowScore += score;
           validQuestions++;
         }
       });
-      
+
       if (validQuestions > 0) {
         courseData[course].scores.push(rowScore / validQuestions);
         courseData[course].count++;
@@ -914,44 +852,44 @@ class AnalyticsService {
    * Calculate semester-wise scores
    */
   calculateSemesterScores(data, headers, questionColumns) {
-    const semesterColumn = headers.find(h => 
+    const semesterColumn = headers.find(h =>
       h.toLowerCase().includes('semester')
     );
-    
+
     if (!semesterColumn || questionColumns.length === 0) {
       return [];
     }
 
     const semesterData = {};
-    
+
     data.forEach(row => {
       const semester = String(row[semesterColumn] || '').trim();
       if (!semester) return;
-      
+
       if (!semesterData[semester]) {
         semesterData[semester] = { scores: [], count: 0 };
       }
-      
+
       let rowScore = 0;
       let validQuestions = 0;
-      
+
       questionColumns.forEach(q => {
         const rawValue = row[q];
         let score;
-        
+
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
         } else {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           rowScore += score;
           validQuestions++;
         }
       });
-      
+
       if (validQuestions > 0) {
         semesterData[semester].scores.push(rowScore / validQuestions);
         semesterData[semester].count++;
@@ -979,14 +917,14 @@ class AnalyticsService {
         'Disagree': 0,
         'Strongly Disagree': 0
       };
-      
+
       let totalScore = 0;
       let validResponses = 0;
-      
+
       data.forEach(row => {
         const rawValue = row[question];
         let score;
-        
+
         // Handle numeric values directly
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
@@ -994,11 +932,11 @@ class AnalyticsService {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           totalScore += score;
           validResponses++;
-          
+
           // Map to distribution
           if (score === 5) distribution['Strongly Agree']++;
           else if (score === 4) distribution['Agree']++;
@@ -1007,9 +945,9 @@ class AnalyticsService {
           else if (score === 1) distribution['Strongly Disagree']++;
         }
       });
-      
+
       const avgScore = validResponses > 0 ? totalScore / validResponses : 0;
-      
+
       return {
         question,
         score: Math.round(avgScore * 100) / 100,
@@ -1024,32 +962,32 @@ class AnalyticsService {
    */
   calculateGroupScores(data, headers, groupKeyword, questionColumns) {
     // Find the grouping column
-    const groupColumn = headers.find(h => 
+    const groupColumn = headers.find(h =>
       h.toLowerCase().includes(groupKeyword)
     );
-    
+
     if (!groupColumn || questionColumns.length === 0) {
       return [];
     }
 
     const groupedData = {};
-    
+
     data.forEach(row => {
       const groupValue = String(row[groupColumn] || '').trim();
       if (!groupValue) return;
-      
+
       if (!groupedData[groupValue]) {
         groupedData[groupValue] = { scores: [], count: 0 };
       }
-      
+
       // Calculate average score across all questions for this row
       let rowScore = 0;
       let validQuestions = 0;
-      
+
       questionColumns.forEach(q => {
         const rawValue = row[q];
         let score;
-        
+
         // Handle numeric values directly
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
@@ -1057,13 +995,13 @@ class AnalyticsService {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           rowScore += score;
           validQuestions++;
         }
       });
-      
+
       if (validQuestions > 0) {
         groupedData[groupValue].scores.push(rowScore / validQuestions);
         groupedData[groupValue].count++;
@@ -1085,40 +1023,40 @@ class AnalyticsService {
    */
   calculateTimeTrends(data, headers, questionColumns) {
     // Find timestamp column
-    const timestampColumn = headers.find(h => 
-      h.toLowerCase().includes('timestamp') || 
+    const timestampColumn = headers.find(h =>
+      h.toLowerCase().includes('timestamp') ||
       h.toLowerCase().includes('date') ||
       h.toLowerCase().includes('time')
     );
-    
+
     if (!timestampColumn || questionColumns.length === 0) {
       return [];
     }
 
     const weeklyData = {};
-    
+
     data.forEach(row => {
       const timestamp = row[timestampColumn];
       if (!timestamp) return;
-      
+
       // Parse date and get week number
       const date = new Date(timestamp);
       if (isNaN(date.getTime())) return;
-      
+
       const weekKey = this.getWeekKey(date);
-      
+
       if (!weeklyData[weekKey]) {
         weeklyData[weekKey] = { scores: [], date };
       }
-      
+
       // Calculate average score for this row
       let rowScore = 0;
       let validQuestions = 0;
-      
+
       questionColumns.forEach(q => {
         const rawValue = row[q];
         let score;
-        
+
         // Handle numeric values directly
         if (typeof rawValue === 'number' && rawValue >= 1 && rawValue <= 5) {
           score = Math.round(rawValue);
@@ -1126,13 +1064,13 @@ class AnalyticsService {
           const value = String(rawValue || '').toLowerCase().trim();
           score = LIKERT_MAPPING.get(value);
         }
-        
+
         if (score !== undefined && score >= 1 && score <= 5) {
           rowScore += score;
           validQuestions++;
         }
       });
-      
+
       if (validQuestions > 0) {
         weeklyData[weekKey].scores.push(rowScore / validQuestions);
       }

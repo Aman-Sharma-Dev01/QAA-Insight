@@ -1046,9 +1046,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           if (!categoryMerges) return name;
 
           // Check if this name is a variant of any canonical name
-          for (const [canonical, variants] of Object.entries(categoryMerges)) {
-            if (variants.includes(name) || canonical === name) {
-              return canonical;
+          for (const [canonical, mergeData] of Object.entries(categoryMerges)) {
+            if (mergeData && (mergeData as any).variants && Array.isArray((mergeData as any).variants)) {
+              if ((mergeData as any).variants.includes(name) || canonical === name) {
+                return canonical;
+              }
+            } else if (Array.isArray(mergeData)) {
+              // Fallback for old data structure where it was just an array
+              if (mergeData.includes(name) || canonical === name) {
+                return canonical;
+              }
             }
           }
           return name;
@@ -1057,6 +1064,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         // Group data by faculty and section
         const facultyGroups: Record<string, {
           info: Record<string, string>;
+          rowCount: number;
           questionTotals: Record<string, { sum: number; count: number }>;
           comments: string[];
         }> = {};
@@ -1083,10 +1091,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 'Section': section,
                 'Course Name': courseCol ? String(row[courseCol] || '') : ''
               },
+              rowCount: 0,
               questionTotals: {},
               comments: []
             };
           }
+
+          // Increment count for this specific faculty+section combination
+          facultyGroups[groupKey].rowCount++;
 
           // Accumulate question scores
           questionColumns.forEach(qCol => {
@@ -1115,7 +1127,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
         // Headers for the main data
         const mainHeaders = [
-          'S.No', 'Faculty Name', 'School', 'Department', 'Semester', 'Section', 'Course Name',
+          'S.No', 'Faculty Name', 'School', 'Department', 'Semester', 'Section', 'Course Name', 'Total Responses',
           ...shortQuestionNames, 'Overall Avg', 'Comments'
         ];
 
@@ -1142,6 +1154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             'Semester': group.info['Semester'],
             'Section': group.info['Section'],
             'Course Name': group.info['Course Name'],
+            'Total Responses': group.rowCount,
             'Overall Avg': overallAvg.toFixed(1),
             'Comments': formattedComments
           };
@@ -1174,6 +1187,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           ? grandQuestionAvgs.reduce((a, b) => a + b, 0) / grandQuestionAvgs.length
           : 0;
 
+        // Calculate total grand responses
+        const grandTotalResponses = Object.values(facultyGroups).reduce((sum, group) => sum + group.rowCount, 0);
+
         // Add summary row
         const summaryRow: Record<string, unknown> = {
           'S.No': '',
@@ -1183,6 +1199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           'Semester': '',
           'Section': '',
           'Course Name': '',
+          'Total Responses': grandTotalResponses,
           'Overall Avg': grandOverallAvg.toFixed(1),
           'Comments': ''
         };

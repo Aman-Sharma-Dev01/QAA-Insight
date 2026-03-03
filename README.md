@@ -1,4 +1,4 @@
-# EduPulse - College Feedback Analytics Portal
+# Insight4Excellence - College Feedback Analytics Portal
 
 A production-ready web portal for analyzing college feedback data collected via Google Forms and stored in Google Sheets. The system handles large datasets (20,000-25,000+ rows) efficiently by performing server-side aggregation.
 

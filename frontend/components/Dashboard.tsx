@@ -7,7 +7,8 @@ import StatsCards from './StatsCards';
 import AnalyticsCharts from './AnalyticsCharts';
 import FilteredDataTable from './FilteredDataTable';
 import FacultyScorecard from './FacultyScorecard';
-import { Filter, Download, Database, ChevronDown, ChevronLeft, ChevronRight, User as UserIcon, LogOut, BrainCircuit, Plus, FileText, X, RefreshCw, Clock, Search, AlertCircle, Table, BarChart3, CheckCircle, Award, Users, BookOpen, Layers, PanelLeftClose, PanelLeft, FileSpreadsheet, Star, StarHalf, AlertTriangle, Loader2 } from 'lucide-react';
+import { Filter, Download, Database, ChevronDown, ChevronLeft, ChevronRight, User as UserIcon, LogOut, BrainCircuit, Plus, FileText, X, RefreshCw, Clock, Search, AlertCircle, Table, BarChart3, CheckCircle, Award, Users, BookOpen, Layers, PanelLeftClose, PanelLeft, FileSpreadsheet, Star, StarHalf, AlertTriangle, Loader2, PieChart as PieChartIcon } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Cell, Legend, PieChart, Pie } from 'recharts';
 import * as XLSX from 'xlsx';
 
 interface DashboardProps {
@@ -120,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   // Faculty averages state for display
   const [facultyAverages, setFacultyAverages] = React.useState<{
-    questionScores: { name: string; avg: number }[];
+    questionScores: { name: string; fullName: string; avg: number }[];
     overallAvg: number;
     facultyName: string;
     school: string;
@@ -136,6 +137,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     step: 'confirming' | 'updating-sheet' | 'refreshing' | 'complete' | null;
     message: string;
   }>({ isProcessing: false, step: null, message: '' });
+
+  // Scorecard view mode: 'details' shows boxes, 'graph' shows charts
+  const [scorecardViewMode, setScorecardViewMode] = React.useState<'details' | 'graph'>('details');
 
   const refreshTimerRef = React.useRef<number | null>(null);
 
@@ -532,7 +536,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           const questionScores = questionColumns.map((qCol, i) => {
             const totals = questionTotals[qCol];
             const avg = totals && totals.count > 0 ? totals.sum / totals.count : 0;
-            return { name: `Q${i + 1}`, avg };
+            return { name: `Q${i + 1}`, fullName: qCol, avg };
           });
 
           const overallAvg = questionScores.length > 0
@@ -2199,34 +2203,321 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                           )}
                         </div>
 
-                        {/* Question Scores */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 mb-4">
-                          {facultyAverages.questionScores.map((q, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-white rounded-lg p-3 border border-emerald-100 shadow-sm text-center"
-                            >
-                              <p className="text-xs font-bold text-emerald-600 mb-1">{q.name}</p>
-                              <p className={`text-xl font-bold ${q.avg >= 4.0 ? 'text-emerald-600' :
-                                q.avg >= 3.5 ? 'text-blue-600' :
-                                  q.avg >= 3.0 ? 'text-amber-600' : 'text-red-600'
-                                }`}>
-                                {q.avg.toFixed(1)}
-                              </p>
-                            </div>
-                          ))}
+                        {/* View Mode Tabs: Details | Graph */}
+                        <div className="flex items-center gap-2 mb-4 bg-white/50 p-1 rounded-lg border border-emerald-100 w-fit">
+                          <button
+                            onClick={() => setScorecardViewMode('details')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all duration-200 ${scorecardViewMode === 'details'
+                              ? 'bg-emerald-500 text-white shadow-md'
+                              : 'text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <Table className="w-4 h-4" /> Details
+                          </button>
+                          <button
+                            onClick={() => setScorecardViewMode('graph')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all duration-200 ${scorecardViewMode === 'graph'
+                              ? 'bg-emerald-500 text-white shadow-md'
+                              : 'text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                          >
+                            <BarChart3 className="w-4 h-4" /> Graph
+                          </button>
+                        </div>
 
-                          {/* Overall Average */}
-                          <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg p-3 shadow-md text-center col-span-2">
-                            <p className="text-xs font-bold text-emerald-100 mb-1">Overall Avg</p>
-                            <div className="flex items-center justify-center gap-2">
-                              <p className="text-2xl font-bold text-white">
-                                {facultyAverages.overallAvg.toFixed(1)}
-                              </p>
-                              <span className="text-emerald-200 text-sm">/5.0</span>
+                        {/* Details View - Question Scores as cards */}
+                        {scorecardViewMode === 'details' && (
+                          <div className="space-y-3 mb-4">
+                            {facultyAverages.questionScores.map((q, idx) => {
+                              const score = q.avg;
+                              const color = score >= 4.0 ? 'emerald' : score >= 3.5 ? 'blue' : score >= 3.0 ? 'amber' : 'red';
+                              const status = score >= 4.0 ? 'Excellent' : score >= 3.5 ? 'Good' : score >= 3.0 ? 'Average' : 'Needs Improvement';
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`bg-white rounded-xl p-4 border-l-4 shadow-sm hover:shadow-md transition-all duration-200 ${
+                                    color === 'emerald' ? 'border-l-emerald-500' :
+                                    color === 'blue' ? 'border-l-blue-500' :
+                                    color === 'amber' ? 'border-l-amber-500' : 'border-l-red-500'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-4">
+                                    {/* Question Number Badge */}
+                                    <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg ${
+                                      color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
+                                      color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                                      color === 'amber' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                                    }`}>
+                                      {q.name}
+                                    </div>
+                                    
+                                    {/* Question Text */}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-slate-700 leading-relaxed">{q.fullName}</p>
+                                      <div className="flex items-center gap-3 mt-2">
+                                        {/* Progress bar */}
+                                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                          <div 
+                                            className={`h-full rounded-full transition-all duration-500 ${
+                                              color === 'emerald' ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' :
+                                              color === 'blue' ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
+                                              color === 'amber' ? 'bg-gradient-to-r from-amber-400 to-amber-600' : 'bg-gradient-to-r from-red-400 to-red-600'
+                                            }`}
+                                            style={{ width: `${(score / 5) * 100}%` }}
+                                          />
+                                        </div>
+                                        {/* Status badge */}
+                                        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full ${
+                                          color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
+                                          color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                                          color === 'amber' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                                        }`}>
+                                          {status}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Score */}
+                                    <div className="flex-shrink-0 text-right">
+                                      <p className={`text-3xl font-black ${
+                                        color === 'emerald' ? 'text-emerald-600' :
+                                        color === 'blue' ? 'text-blue-600' :
+                                        color === 'amber' ? 'text-amber-600' : 'text-red-600'
+                                      }`}>
+                                        {score.toFixed(1)}
+                                      </p>
+                                      <p className="text-xs text-slate-400">out of 5.0</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {/* Overall Average Card */}
+                            <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-xl p-5 shadow-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-emerald-100 text-sm font-semibold uppercase tracking-wide">Overall Average</p>
+                                  <div className="flex items-end gap-2 mt-1">
+                                    <span className="text-4xl font-black text-white">{facultyAverages.overallAvg.toFixed(1)}</span>
+                                    <span className="text-emerald-200 text-lg mb-1">/5.0</span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-emerald-100 text-sm">
+                                    {facultyAverages.overallAvg >= 4.5 ? '🌟 Outstanding!' :
+                                     facultyAverages.overallAvg >= 4.0 ? '✨ Excellent!' :
+                                     facultyAverages.overallAvg >= 3.5 ? '👍 Good' :
+                                     facultyAverages.overallAvg >= 3.0 ? '📈 Average' :
+                                     '⚠️ Needs Improvement'}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Graph View - Beautiful charts */}
+                        {scorecardViewMode === 'graph' && (
+                          <div className="space-y-6 mb-4">
+                            {/* Charts Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* Bar Chart - Per Question Scores */}
+                              <div className="bg-white rounded-xl p-5 border border-emerald-100 shadow-lg">
+                                <h4 className="text-sm font-bold text-emerald-700 mb-4 flex items-center gap-2">
+                                  <BarChart3 className="w-4 h-4" /> Per-Question Performance
+                                </h4>
+                                <div className="h-72">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                      data={facultyAverages.questionScores.map(q => ({
+                                        name: q.name,
+                                        fullName: q.fullName,
+                                        score: q.avg
+                                      }))}
+                                      margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
+                                    >
+                                      <defs>
+                                        <linearGradient id="barGradientGreen" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
+                                          <stop offset="100%" stopColor="#059669" stopOpacity={0.8}/>
+                                        </linearGradient>
+                                        <linearGradient id="barGradientBlue" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
+                                          <stop offset="100%" stopColor="#2563eb" stopOpacity={0.8}/>
+                                        </linearGradient>
+                                        <linearGradient id="barGradientAmber" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="0%" stopColor="#f59e0b" stopOpacity={1}/>
+                                          <stop offset="100%" stopColor="#d97706" stopOpacity={0.8}/>
+                                        </linearGradient>
+                                        <linearGradient id="barGradientRed" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
+                                          <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8}/>
+                                        </linearGradient>
+                                      </defs>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                      <XAxis 
+                                        dataKey="name" 
+                                        tick={{ fontSize: 12, fill: '#374151', fontWeight: 600 }}
+                                        axisLine={{ stroke: '#e5e7eb' }}
+                                        tickLine={false}
+                                      />
+                                      <YAxis 
+                                        domain={[0, 5]} 
+                                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        ticks={[0, 1, 2, 3, 4, 5]}
+                                      />
+                                      <Tooltip
+                                        cursor={{ fill: 'rgba(16, 185, 129, 0.1)' }}
+                                        content={({ active, payload }) => {
+                                          if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            const score = data.score;
+                                            const color = score >= 4.0 ? '#10b981' : score >= 3.5 ? '#3b82f6' : score >= 3.0 ? '#f59e0b' : '#ef4444';
+                                            const status = score >= 4.0 ? 'Excellent' : score >= 3.5 ? 'Good' : score >= 3.0 ? 'Average' : 'Needs Improvement';
+                                            return (
+                                              <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-4 max-w-xs">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                                  <span className="font-bold text-slate-800">{data.name}</span>
+                                                  <span className="ml-auto text-lg font-black" style={{ color }}>{score.toFixed(1)}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-600 leading-relaxed mb-2">{data.fullName}</p>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ backgroundColor: `${color}20`, color }}>{status}</span>
+                                                </div>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        }}
+                                      />
+                                      <Bar dataKey="score" radius={[8, 8, 0, 0]} maxBarSize={60}>
+                                        {facultyAverages.questionScores.map((q, index) => (
+                                          <Cell
+                                            key={`cell-${index}`}
+                                            fill={q.avg >= 4.0 ? 'url(#barGradientGreen)' : q.avg >= 3.5 ? 'url(#barGradientBlue)' : q.avg >= 3.0 ? 'url(#barGradientAmber)' : 'url(#barGradientRed)'}
+                                          />
+                                        ))}
+                                      </Bar>
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                                {/* Legend */}
+                                <div className="flex items-center justify-center gap-4 mt-3 text-xs">
+                                  <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> ≥4.0 Excellent</span>
+                                  <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-blue-500"></div> ≥3.5 Good</span>
+                                  <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-500"></div> ≥3.0 Average</span>
+                                  <span className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500"></div> &lt;3.0 Low</span>
+                                </div>
+                              </div>
+
+                              {/* Radar Chart - Visual Performance Spider */}
+                              <div className="bg-white rounded-xl p-5 border border-emerald-100 shadow-lg">
+                                <h4 className="text-sm font-bold text-emerald-700 mb-4 flex items-center gap-2">
+                                  <Award className="w-4 h-4" /> Performance Radar
+                                </h4>
+                                <div className="h-72">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <RadarChart
+                                      data={facultyAverages.questionScores.map(q => ({
+                                        question: q.name,
+                                        fullName: q.fullName,
+                                        score: q.avg,
+                                        fullMark: 5
+                                      }))}
+                                    >
+                                      <defs>
+                                        <linearGradient id="radarGradient" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+                                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                                        </linearGradient>
+                                      </defs>
+                                      <PolarGrid stroke="#d1d5db" strokeDasharray="3 3" />
+                                      <PolarAngleAxis 
+                                        dataKey="question" 
+                                        tick={{ fontSize: 12, fill: '#374151', fontWeight: 600 }}
+                                      />
+                                      <PolarRadiusAxis 
+                                        angle={90} 
+                                        domain={[0, 5]} 
+                                        tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                        axisLine={false}
+                                      />
+                                      <Radar
+                                        name="Score"
+                                        dataKey="score"
+                                        stroke="#10b981"
+                                        fill="url(#radarGradient)"
+                                        fillOpacity={0.6}
+                                        strokeWidth={3}
+                                        dot={{ r: 5, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                                      />
+                                      <Tooltip
+                                        content={({ active, payload }) => {
+                                          if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            const score = data.score;
+                                            const color = score >= 4.0 ? '#10b981' : score >= 3.5 ? '#3b82f6' : score >= 3.0 ? '#f59e0b' : '#ef4444';
+                                            return (
+                                              <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-4 max-w-xs">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                                  <span className="font-bold text-slate-800">{data.question}</span>
+                                                  <span className="ml-auto text-lg font-black" style={{ color }}>{score.toFixed(1)}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-600 leading-relaxed">{data.fullName}</p>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        }}
+                                      />
+                                    </RadarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                                <p className="text-center text-xs text-slate-500 mt-2">Hover over points to see question details</p>
+                              </div>
+                            </div>
+
+                            {/* Overall Score Gauge / Summary Card */}
+                            <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-xl p-6 shadow-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-emerald-100 text-sm font-semibold uppercase tracking-wide mb-1">Overall Performance</h4>
+                                  <div className="flex items-end gap-2">
+                                    <span className="text-5xl font-black text-white">{facultyAverages.overallAvg.toFixed(1)}</span>
+                                    <span className="text-emerald-200 text-xl mb-2">/5.0</span>
+                                  </div>
+                                  <p className="text-emerald-100 text-sm mt-2">
+                                    {facultyAverages.overallAvg >= 4.5 ? '🌟 Outstanding Performance!' :
+                                     facultyAverages.overallAvg >= 4.0 ? '✨ Excellent Performance!' :
+                                     facultyAverages.overallAvg >= 3.5 ? '👍 Good Performance' :
+                                     facultyAverages.overallAvg >= 3.0 ? '📈 Average Performance' :
+                                     '⚠️ Needs Improvement'}
+                                  </p>
+                                </div>
+                                {/* Mini stats */}
+                                <div className="grid grid-cols-2 gap-4 text-center">
+                                  <div className="bg-white/20 rounded-lg px-4 py-3 backdrop-blur-sm">
+                                    <p className="text-white text-2xl font-bold">
+                                      {Math.max(...facultyAverages.questionScores.map(q => q.avg)).toFixed(1)}
+                                    </p>
+                                    <p className="text-emerald-100 text-xs uppercase tracking-wide">Best Score</p>
+                                  </div>
+                                  <div className="bg-white/20 rounded-lg px-4 py-3 backdrop-blur-sm">
+                                    <p className="text-white text-2xl font-bold">
+                                      {Math.min(...facultyAverages.questionScores.map(q => q.avg)).toFixed(1)}
+                                    </p>
+                                    <p className="text-emerald-100 text-xs uppercase tracking-wide">Lowest Score</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Comments Section */}
                         {facultyAverages.comments.length > 0 && (
